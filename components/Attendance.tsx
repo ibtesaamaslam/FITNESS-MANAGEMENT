@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import { Member, Role } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -8,6 +9,19 @@ interface AttendanceProps {
   role: Role;
   onUpdateAttendance: (memberId: string, date: string, present: boolean) => void;
 }
+
+const isExpiringSoon = (expiryDate: string, days: number = 7): boolean => {
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const threshold = new Date();
+    threshold.setDate(today.getDate() + days);
+
+    today.setHours(0, 0, 0, 0);
+    expiry.setHours(0, 0, 0, 0);
+    threshold.setHours(0, 0, 0, 0);
+
+    return expiry <= threshold && expiry >= today;
+};
 
 const Attendance: React.FC<AttendanceProps> = ({ members, role, onUpdateAttendance }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -142,7 +156,14 @@ const Attendance: React.FC<AttendanceProps> = ({ members, role, onUpdateAttendan
                   <td className="p-4 font-medium flex items-center space-x-3">
                     <img src={member.photo} alt={member.name} className="h-10 w-10 rounded-full object-cover"/>
                     <div>
-                        <span>{member.name}</span>
+                        <div className="flex items-center space-x-2">
+                            <span>{member.name}</span>
+                            {isExpiringSoon(member.expiryDate) && (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-400" title="Membership is expiring soon!">
+                                    Expiring
+                                </span>
+                            )}
+                        </div>
                         <p className="text-xs text-text-secondary font-mono">{member.registrationNo}</p>
                     </div>
                   </td>

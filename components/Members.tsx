@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Member, Payment } from '../types';
 import { CloseIcon, ReportIcon } from './icons';
+import { supabase } from '../lib/supabaseClient';
 
 const WarningIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -69,6 +70,21 @@ const MemberReportModal: React.FC<{
         .map(([date, present]) => ({ date, present }))
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 30);
+        
+    const monthlyAttendanceSummary = useMemo(() => {
+        return Object.entries(member.attendance).reduce((acc, [date, present]) => {
+            const month = date.substring(0, 7); // YYYY-MM
+            if (!acc[month]) {
+                acc[month] = { present: 0, absent: 0 };
+            }
+            if (present) {
+                acc[month].present++;
+            } else {
+                acc[month].absent++;
+            }
+            return acc;
+        }, {} as Record<string, { present: number, absent: number }>);
+    }, [member.attendance]);
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
@@ -86,7 +102,7 @@ const MemberReportModal: React.FC<{
                 <div className="flex-grow overflow-y-auto mt-6 space-y-6">
                     <div>
                         <h3 className="text-xl font-semibold text-text-primary mb-3">Payment History</h3>
-                        <div className="overflow-x-auto max-h-60">
+                        <div className="overflow-x-auto max-h-48">
                             <table className="w-full text-left">
                                 <thead className="bg-secondary sticky top-0">
                                     <tr>
@@ -111,7 +127,7 @@ const MemberReportModal: React.FC<{
                     </div>
                      <div>
                         <h3 className="text-xl font-semibold text-text-primary mb-3">Attendance History (Last 30 Records)</h3>
-                         <div className="overflow-x-auto max-h-60">
+                         <div className="overflow-x-auto max-h-48">
                             <table className="w-full text-left">
                                 <thead className="bg-secondary sticky top-0">
                                     <tr>
@@ -136,6 +152,24 @@ const MemberReportModal: React.FC<{
                             </table>
                         </div>
                     </div>
+                    <div>
+                        <h3 className="text-xl font-semibold text-text-primary mb-3">Monthly Attendance Summary</h3>
+                        <div className="overflow-x-auto max-h-48 space-y-2">
+                             {Object.keys(monthlyAttendanceSummary).length > 0 ? Object.entries(monthlyAttendanceSummary)
+                                .sort(([monthA], [monthB]) => new Date(monthB).getTime() - new Date(monthA).getTime())
+                                .map(([month, stats]) => (
+                                <div key={month} className="bg-secondary p-3 rounded-lg flex items-center justify-between">
+                                    <span className="font-semibold text-text-primary">{new Date(month + '-02').toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
+                                    <div className="flex space-x-4 text-sm">
+                                        <span className="text-green-400">Present: {stats.present}</span>
+                                        <span className="text-red-400">Absent: {stats.absent}</span>
+                                    </div>
+                                </div>
+                             )) : (
+                                <p className="text-center p-8 text-text-secondary">No attendance data to summarize.</p>
+                             )}
+                        </div>
+                    </div>
                 </div>
                 <div className="pt-4 mt-4 border-t border-gray-700 text-right">
                     <button type="button" onClick={onClose} className="py-2 px-4 bg-gray-600 rounded-lg hover:bg-gray-700">Close</button>
@@ -149,21 +183,22 @@ const MemberReportModal: React.FC<{
 interface MembersProps {
   members: Member[];
   payments: Payment[];
-  onAddMember: (member: Omit<Member, 'id'>, paymentMethod: Payment['method']) => void;
-  onUpdateMember: (member: Member, paymentMethod: Payment['method']) => void;
-  onDeleteMember: (id: string) => void;
+  onAddMember: (member: Omit<Member, 'id'>, paymentMethod: Payment['method']) => Promise<void>;
+  onUpdateMember: (member: Member, paymentMethod: Payment['method']) => Promise<void>;
+  onDeleteMember: (id: string) => Promise<void>;
 }
 
 const MemberModal: React.FC<{
     member: Partial<Member> | null;
     onClose: () => void;
-    onSave: (member: Partial<Member>, paymentMethod: Payment['method']) => void;
+    onSave: (member: Partial<Member>, paymentMethod: Payment['method']) => Promise<void>;
 }> = ({ member, onClose, onSave }) => {
     const [formData, setFormData] = useState<Partial<Member> & { paymentMethod?: Payment['method'] }>({});
+    const [isUploading, setIsUploading] = useState(false);
 
     useEffect(() => {
         const initialData: Partial<Member> & { paymentMethod?: Payment['method'] } = (member && member.id)
-            ? member
+            ? { ...member, remindersEnabled: member.remindersEnabled ?? true }
             : {
                 name: '',
                 registrationNo: '',
@@ -176,6 +211,7 @@ const MemberModal: React.FC<{
                 photo: '',
                 expiryDate: '',
                 paymentMethod: 'Cash',
+                remindersEnabled: true,
               };
         setFormData(initialData);
     }, [member]);
@@ -204,25 +240,54 @@ const MemberModal: React.FC<{
             processedValue = parseFloat(value) || 0;
         } else if (name === 'feePaid') {
             processedValue = (e.target as HTMLSelectElement).value === 'true';
+        } else if (type === 'checkbox') {
+            processedValue = (e.target as HTMLInputElement).checked;
         }
 
         setFormData(prev => ({ ...prev, [name]: processedValue }));
     };
 
-    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!supabase) {
+            alert("Supabase client is not configured. Cannot upload photo.");
+            return;
+        }
+        
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
+            
+            // Show preview immediately
             const reader = new FileReader();
             reader.onload = (loadEvent) => {
                 setFormData(prev => ({ ...prev, photo: loadEvent.target?.result as string }));
             };
             reader.readAsDataURL(file);
+            
+            setIsUploading(true);
+
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${crypto.randomUUID()}.${fileExt}`;
+            
+            const { error: uploadError } = await supabase.storage
+                .from('photos')
+                .upload(fileName, file);
+
+            setIsUploading(false);
+
+            if (uploadError) {
+                console.error('Error uploading photo:', uploadError);
+                alert('Failed to upload photo. Please try again.');
+                return;
+            }
+
+            const { data } = supabase.storage.from('photos').getPublicUrl(fileName);
+            setFormData(prev => ({ ...prev, photo: data.publicUrl }));
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(formData, formData.paymentMethod || 'Cash');
+        await onSave(formData, formData.paymentMethod || 'Cash');
     };
     
     if (!member) return null;
@@ -297,8 +362,8 @@ const MemberModal: React.FC<{
                         <div className="flex items-center space-x-4">
                             <img src={formData.photo || `https://ui-avatars.com/api/?name=${formData.name || '?'}&background=374151&color=F9FAFB`} alt="Profile" className="h-20 w-20 rounded-full object-cover bg-secondary" />
                             <div>
-                                <label htmlFor="photo-upload" className="cursor-pointer bg-secondary px-4 py-2 rounded-lg text-sm font-medium text-text-primary hover:bg-gray-600 transition-colors">
-                                    Upload Image
+                                <label htmlFor="photo-upload" className={`cursor-pointer bg-secondary px-4 py-2 rounded-lg text-sm font-medium text-text-primary hover:bg-gray-600 transition-colors ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                    {isUploading ? 'Uploading...' : 'Upload Image'}
                                 </label>
                                 <input
                                     id="photo-upload"
@@ -307,20 +372,53 @@ const MemberModal: React.FC<{
                                     accept="image/png, image/jpeg"
                                     onChange={handlePhotoChange}
                                     className="hidden"
+                                    disabled={isUploading}
                                 />
                             </div>
                         </div>
                     </div>
                     
+                    <div className="col-span-2 mt-2">
+                        <div className="flex items-center space-x-3">
+                            <input 
+                                type="checkbox" 
+                                id="remindersEnabled" 
+                                name="remindersEnabled"
+                                checked={formData.remindersEnabled ?? true} 
+                                onChange={handleChange}
+                                className="h-4 w-4 rounded border-gray-500 bg-secondary text-primary focus:ring-primary"
+                            />
+                            <label htmlFor="remindersEnabled" className="text-sm font-medium text-text-secondary">
+                                Enable Fee/Expiry Reminders
+                            </label>
+                        </div>
+                    </div>
+
                     <div className="col-span-2 flex justify-end space-x-4 pt-4 mt-4 border-t border-gray-700">
                         <button type="button" onClick={onClose} className="py-2 px-4 bg-gray-600 rounded-lg hover:bg-gray-700">Cancel</button>
-                        <button type="submit" className="py-2 px-4 bg-primary rounded-lg hover:bg-primary-hover">Save Member</button>
+                        <button type="submit" className="py-2 px-4 bg-primary rounded-lg hover:bg-primary-hover disabled:opacity-50" disabled={isUploading}>
+                            {isUploading ? 'Waiting for Upload...' : 'Save Member'}
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     );
 };
+
+const isExpiringSoon = (expiryDate: string, days: number = 7): boolean => {
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const threshold = new Date();
+    threshold.setDate(today.getDate() + days);
+
+    today.setHours(0, 0, 0, 0);
+    expiry.setHours(0, 0, 0, 0);
+    threshold.setHours(0, 0, 0, 0);
+
+    return expiry <= threshold && expiry >= today;
+};
+
 
 const Members: React.FC<MembersProps> = ({ members, payments, onAddMember, onUpdateMember, onDeleteMember }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -351,25 +449,24 @@ const Members: React.FC<MembersProps> = ({ members, payments, onAddMember, onUpd
         setIsConfirmModalOpen(true);
     };
     
-    const handleConfirmDelete = () => {
+    const handleConfirmDelete = async () => {
         if(memberToDelete) {
-            onDeleteMember(memberToDelete.id);
+            await onDeleteMember(memberToDelete.id);
         }
         setIsConfirmModalOpen(false);
         setMemberToDelete(null);
     };
 
-    const handleSave = (memberData: Partial<Member>, paymentMethod: Payment['method']) => {
+    const handleSave = async (memberData: Partial<Member>, paymentMethod: Payment['method']) => {
         if (memberData.id) {
-            onUpdateMember(memberData as Member, paymentMethod);
+            await onUpdateMember(memberData as Member, paymentMethod);
         } else {
             const newMember = {
                 ...memberData,
-                photo: memberData.photo || `https://picsum.photos/seed/${Math.random()}/200`,
                 attendance: {},
             } as Omit<Member, 'id'>;
 
-            onAddMember(newMember, paymentMethod);
+            await onAddMember(newMember, paymentMethod);
         }
         setIsModalOpen(false);
         setSelectedMember(null);
@@ -426,9 +523,19 @@ const Members: React.FC<MembersProps> = ({ members, payments, onAddMember, onUpd
                                             {member.feePaid ? 'Paid' : 'Unpaid'}
                                         </span>
                                     </td>
-                                    <td className="p-4">{member.expiryDate}</td>
+                                    <td className="p-4">
+                                        <div className="flex items-center">
+                                            <span>{member.expiryDate}</span>
+                                            {isExpiringSoon(member.expiryDate) && (
+                                                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-400" title="Membership is expiring soon!">
+                                                    Expiring
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
                                     <td className="p-4 flex items-center space-x-2">
                                         <button onClick={() => handleViewReport(member)} className="text-gray-400 hover:text-white" title="View Report"><ReportIcon/></button>
+
                                         <button onClick={() => handleEdit(member)} className="text-blue-400 hover:text-blue-300">Edit</button>
                                         <button onClick={() => handleDeleteRequest(member)} className="text-red-400 hover:text-red-300">Delete</button>
                                     </td>

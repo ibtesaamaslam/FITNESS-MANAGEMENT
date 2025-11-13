@@ -1,6 +1,5 @@
-
 export type Role = 'Admin' | 'Manager' | 'Member';
-export type View = 'dashboard' | 'members' | 'fees' | 'attendance';
+export type View = 'dashboard' | 'members' | 'fees' | 'attendance' | 'report';
 
 export interface Member {
   id: string;
@@ -14,6 +13,7 @@ export interface Member {
   joinDate: string; // YYYY-MM-DD
   expiryDate: string; // YYYY-MM-DD
   photo: string;
+  remindersEnabled?: boolean;
   attendance: { [date: string]: boolean }; // date: YYYY-MM-DD
 }
 
