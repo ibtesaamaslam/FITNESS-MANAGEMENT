@@ -25,3 +25,11 @@ export interface Payment {
   amount: number;
   method: 'Cash' | 'Easypaisa' | 'Jazz Cash' | 'Bank Transfer';
 }
+
+export type ToastType = 'success' | 'error' | 'info';
+
+export interface ToastMessage {
+  id: string;
+  message: string;
+  type: ToastType;
+}

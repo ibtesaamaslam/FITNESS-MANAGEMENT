@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Member, Payment } from '../types';
 import { CloseIcon, ReportIcon } from './icons';
-import { supabase } from '../lib/supabaseClient';
 
 const WarningIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -183,18 +182,17 @@ const MemberReportModal: React.FC<{
 interface MembersProps {
   members: Member[];
   payments: Payment[];
-  onAddMember: (member: Omit<Member, 'id'>, paymentMethod: Payment['method']) => Promise<void>;
-  onUpdateMember: (member: Member, paymentMethod: Payment['method']) => Promise<void>;
-  onDeleteMember: (id: string) => Promise<void>;
+  onAddMember: (member: Omit<Member, 'id'>, paymentMethod: Payment['method']) => void;
+  onUpdateMember: (member: Member, paymentMethod: Payment['method']) => void;
+  onDeleteMember: (id: string) => void;
 }
 
 const MemberModal: React.FC<{
     member: Partial<Member> | null;
     onClose: () => void;
-    onSave: (member: Partial<Member>, paymentMethod: Payment['method']) => Promise<void>;
+    onSave: (member: Partial<Member>, paymentMethod: Payment['method']) => void;
 }> = ({ member, onClose, onSave }) => {
     const [formData, setFormData] = useState<Partial<Member> & { paymentMethod?: Payment['method'] }>({});
-    const [isUploading, setIsUploading] = useState(false);
 
     useEffect(() => {
         const initialData: Partial<Member> & { paymentMethod?: Payment['method'] } = (member && member.id)
@@ -247,47 +245,20 @@ const MemberModal: React.FC<{
         setFormData(prev => ({ ...prev, [name]: processedValue }));
     };
 
-    const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!supabase) {
-            alert("Supabase client is not configured. Cannot upload photo.");
-            return;
-        }
-        
+    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            
-            // Show preview immediately
             const reader = new FileReader();
             reader.onload = (loadEvent) => {
                 setFormData(prev => ({ ...prev, photo: loadEvent.target?.result as string }));
             };
             reader.readAsDataURL(file);
-            
-            setIsUploading(true);
-
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${crypto.randomUUID()}.${fileExt}`;
-            
-            const { error: uploadError } = await supabase.storage
-                .from('photos')
-                .upload(fileName, file);
-
-            setIsUploading(false);
-
-            if (uploadError) {
-                console.error('Error uploading photo:', uploadError);
-                alert('Failed to upload photo. Please try again.');
-                return;
-            }
-
-            const { data } = supabase.storage.from('photos').getPublicUrl(fileName);
-            setFormData(prev => ({ ...prev, photo: data.publicUrl }));
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        await onSave(formData, formData.paymentMethod || 'Cash');
+        onSave(formData, formData.paymentMethod || 'Cash');
     };
     
     if (!member) return null;
@@ -362,8 +333,8 @@ const MemberModal: React.FC<{
                         <div className="flex items-center space-x-4">
                             <img src={formData.photo || `https://ui-avatars.com/api/?name=${formData.name || '?'}&background=374151&color=F9FAFB`} alt="Profile" className="h-20 w-20 rounded-full object-cover bg-secondary" />
                             <div>
-                                <label htmlFor="photo-upload" className={`cursor-pointer bg-secondary px-4 py-2 rounded-lg text-sm font-medium text-text-primary hover:bg-gray-600 transition-colors ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                    {isUploading ? 'Uploading...' : 'Upload Image'}
+                                <label htmlFor="photo-upload" className="cursor-pointer bg-secondary px-4 py-2 rounded-lg text-sm font-medium text-text-primary hover:bg-gray-600 transition-colors">
+                                    Upload Image
                                 </label>
                                 <input
                                     id="photo-upload"
@@ -372,7 +343,6 @@ const MemberModal: React.FC<{
                                     accept="image/png, image/jpeg"
                                     onChange={handlePhotoChange}
                                     className="hidden"
-                                    disabled={isUploading}
                                 />
                             </div>
                         </div>
@@ -396,9 +366,7 @@ const MemberModal: React.FC<{
 
                     <div className="col-span-2 flex justify-end space-x-4 pt-4 mt-4 border-t border-gray-700">
                         <button type="button" onClick={onClose} className="py-2 px-4 bg-gray-600 rounded-lg hover:bg-gray-700">Cancel</button>
-                        <button type="submit" className="py-2 px-4 bg-primary rounded-lg hover:bg-primary-hover disabled:opacity-50" disabled={isUploading}>
-                            {isUploading ? 'Waiting for Upload...' : 'Save Member'}
-                        </button>
+                        <button type="submit" className="py-2 px-4 bg-primary rounded-lg hover:bg-primary-hover">Save Member</button>
                     </div>
                 </form>
             </div>
@@ -449,24 +417,25 @@ const Members: React.FC<MembersProps> = ({ members, payments, onAddMember, onUpd
         setIsConfirmModalOpen(true);
     };
     
-    const handleConfirmDelete = async () => {
+    const handleConfirmDelete = () => {
         if(memberToDelete) {
-            await onDeleteMember(memberToDelete.id);
+            onDeleteMember(memberToDelete.id);
         }
         setIsConfirmModalOpen(false);
         setMemberToDelete(null);
     };
 
-    const handleSave = async (memberData: Partial<Member>, paymentMethod: Payment['method']) => {
+    const handleSave = (memberData: Partial<Member>, paymentMethod: Payment['method']) => {
         if (memberData.id) {
-            await onUpdateMember(memberData as Member, paymentMethod);
+            onUpdateMember(memberData as Member, paymentMethod);
         } else {
             const newMember = {
                 ...memberData,
+                photo: memberData.photo || `https://picsum.photos/seed/${Math.random()}/200`,
                 attendance: {},
             } as Omit<Member, 'id'>;
 
-            await onAddMember(newMember, paymentMethod);
+            onAddMember(newMember, paymentMethod);
         }
         setIsModalOpen(false);
         setSelectedMember(null);
@@ -535,7 +504,6 @@ const Members: React.FC<MembersProps> = ({ members, payments, onAddMember, onUpd
                                     </td>
                                     <td className="p-4 flex items-center space-x-2">
                                         <button onClick={() => handleViewReport(member)} className="text-gray-400 hover:text-white" title="View Report"><ReportIcon/></button>
-
                                         <button onClick={() => handleEdit(member)} className="text-blue-400 hover:text-blue-300">Edit</button>
                                         <button onClick={() => handleDeleteRequest(member)} className="text-red-400 hover:text-red-300">Delete</button>
                                     </td>
