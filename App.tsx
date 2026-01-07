@@ -44,6 +44,7 @@ const App: React.FC = () => {
         addMember, 
         updateMember, 
         deleteMember, 
+        deletePayment,
         updateAttendance, 
         toggleReminder 
     } = useGymData();
@@ -75,6 +76,11 @@ const App: React.FC = () => {
         deleteMember(id);
         showToast('Member deleted successfully', 'info');
     }, [deleteMember, showToast]);
+
+    const handleDeletePayment = useCallback((id: string) => {
+        deletePayment(id);
+        showToast('Payment record deleted successfully', 'info');
+    }, [deletePayment, showToast]);
 
     const handleUpdateAttendance = useCallback((memberId: string, date: string, present: boolean) => {
         updateAttendance(memberId, date, present);
@@ -120,14 +126,14 @@ const App: React.FC = () => {
             case 'members':
                 return <Members members={members} payments={payments} onAddMember={handleAddMember} onUpdateMember={handleUpdateMember} onDeleteMember={handleDeleteMember} />;
             case 'fees':
-                return <Fees members={members} payments={payments} onToggleReminders={handleToggleReminders} />;
+                return <Fees members={members} payments={payments} onToggleReminders={handleToggleReminders} onDeletePayment={handleDeletePayment} />;
             case 'attendance':
                 return <Attendance members={members} role={role} onUpdateAttendance={handleUpdateAttendance} />;
             case 'report':
                 return <Report members={members} payments={payments} />;
             case 'dashboard':
             default:
-                return <Dashboard members={members} payments={payments} onNavigate={(v) => setView(v)} />;
+                return <Dashboard members={members} payments={payments} onNavigate={(v) => setView(v)} onDeletePayment={handleDeletePayment} />;
         }
     };
 

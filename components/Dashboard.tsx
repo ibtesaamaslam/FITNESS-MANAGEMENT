@@ -1,11 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Member, Payment } from '../types';
+import { TrashIcon, CloseIcon } from './icons';
 
 interface DashboardProps {
   members: Member[];
   payments: Payment[];
   onNavigate: (view: 'members' | 'fees' | 'attendance') => void;
+  onDeletePayment: (id: string) => void;
 }
 
 const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode }> = ({ title, value, icon }) => (
@@ -18,7 +20,39 @@ const StatCard: React.FC<{ title: string; value: string | number; icon: React.Re
   </div>
 );
 
-const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate }) => {
+const ConfirmPaymentDeleteModal: React.FC<{
+    payment: Payment | null;
+    onClose: () => void;
+    onConfirm: () => void;
+}> = ({ payment, onClose, onConfirm }) => {
+    if (!payment) return null;
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+            <div className="bg-surface rounded-lg shadow-xl p-6 w-full max-w-md relative">
+                 <button onClick={onClose} className="absolute top-4 right-4 text-text-secondary hover:text-text-primary">
+                    <CloseIcon className="h-5 w-5"/>
+                 </button>
+                 <div className="flex items-center space-x-3 mb-4 text-red-400">
+                    <div className="bg-red-400/20 p-2 rounded-full">
+                        <TrashIcon className="h-6 w-6"/>
+                    </div>
+                    <h3 className="text-xl font-bold text-text-primary">Delete Payment</h3>
+                 </div>
+                 <p className="mb-6 text-text-secondary">
+                    Are you sure you want to delete the payment of <span className="text-white font-bold">Rs {payment.amount}</span> for <span className="text-white font-bold">{payment.memberName}</span> dated {payment.date}?
+                 </p>
+                 <div className="flex justify-end space-x-3">
+                    <button onClick={onClose} className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors">Cancel</button>
+                    <button onClick={onConfirm} className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-bold transition-colors">Delete Payment</button>
+                 </div>
+            </div>
+        </div>
+    );
+};
+
+const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate, onDeletePayment }) => {
+  const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
+
   const totalMembers = members.length;
   const activeMembers = members.filter(m => new Date(m.expiryDate) > new Date()).length;
   const monthlyIncome = payments
@@ -56,8 +90,23 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate }) 
 
   const recentPayments = [...payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
 
+  const confirmDeletePayment = () => {
+    if(paymentToDelete) {
+        onDeletePayment(paymentToDelete.id);
+        setPaymentToDelete(null);
+    }
+  };
+
   return (
     <div className="p-4 md:p-8 space-y-8">
+      {paymentToDelete && (
+        <ConfirmPaymentDeleteModal 
+            payment={paymentToDelete} 
+            onClose={() => setPaymentToDelete(null)} 
+            onConfirm={confirmDeletePayment} 
+        />
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="Total Members" value={totalMembers} icon={<UsersIcon />} />
         <StatCard title="Active Members" value={activeMembers} icon={<UserCheckIcon />} />
@@ -114,6 +163,7 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate }) 
                 <th className="p-3">Date</th>
                 <th className="p-3">Amount</th>
                 <th className="p-3">Method</th>
+                <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -123,10 +173,19 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate }) 
                   <td className="p-3">{p.date}</td>
                   <td className="p-3">Rs {p.amount.toLocaleString()}</td>
                   <td className="p-3">{p.method}</td>
+                  <td className="p-3 text-right">
+                    <button 
+                        onClick={() => setPaymentToDelete(p)}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-2 rounded transition-colors"
+                        title="Delete Payment"
+                    >
+                        <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={4} className="text-center p-8 text-text-secondary">No payments recorded yet.</td>
+                  <td colSpan={5} className="text-center p-8 text-text-secondary">No payments recorded yet.</td>
                 </tr>
               )}
             </tbody>

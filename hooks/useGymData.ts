@@ -86,6 +86,10 @@ export const useGymData = () => {
         setMembers(prev => prev.filter(m => m.id !== id));
     }, []);
 
+    const deletePayment = useCallback((id: string) => {
+        setPayments(prev => prev.filter(p => p.id !== id));
+    }, []);
+
     const updateAttendance = useCallback((memberId: string, date: string, present: boolean) => {
         setMembers(prev => prev.map(m =>
             m.id === memberId
@@ -108,6 +112,7 @@ export const useGymData = () => {
         addMember,
         updateMember,
         deleteMember,
+        deletePayment,
         updateAttendance,
         toggleReminder
     };
