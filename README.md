@@ -1,4 +1,4 @@
-# 🏋️‍♂️ Saqib Fitness - Gym Management System
+# 🏋️‍♂️ Fitness Arena - Gym Management System
 
 A modern, responsive, and full-featured web application designed to streamline gym operations. This system manages members, tracks payments, records attendance, and provides actionable insights via a real-time dashboard.
 
