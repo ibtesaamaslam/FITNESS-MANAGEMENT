@@ -1,5 +1,5 @@
 {
-  "name": "saqib-fitness-gym-management-system",
+  "name": "gym-khata",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,9 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "recharts": "^3.3.0",
-    "react-dom": "^19.2.0",
-    "react": "^19.2.0"
+    "recharts": "^3.7.0",
+    "react-dom": "^19.2.4",
+    "react": "^19.2.4"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

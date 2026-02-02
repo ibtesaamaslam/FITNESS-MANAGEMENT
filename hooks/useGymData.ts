@@ -1,119 +1,168 @@
+
 import { useState, useEffect, useCallback } from 'react';
-import { Member, Payment } from '../types';
+import { Member, Payment, Gym, Visitor } from '../types';
 
-export const useGymData = () => {
-    const [members, setMembers] = useState<Member[]>(() => {
-        try {
-            const storedMembers = localStorage.getItem('gymMembers');
-            return storedMembers ? JSON.parse(storedMembers) : [];
-        } catch (error) {
-            console.error("Failed to parse members from localStorage", error);
-            return [];
-        }
-    });
+export const useGymData = (gymId: string | undefined) => {
+    const [members, setMembers] = useState<Member[]>([]);
+    const [payments, setPayments] = useState<Payment[]>([]);
+    const [visitors, setVisitors] = useState<Visitor[]>([]);
+    const [gymName, setGymName] = useState<string>('');
 
-    const [payments, setPayments] = useState<Payment[]>(() => {
-        try {
-            const storedPayments = localStorage.getItem('gymPayments');
-            return storedPayments ? JSON.parse(storedPayments) : [];
-        } catch (error) {
-            console.error("Failed to parse payments from localStorage", error);
-            return [];
+    // Load data event listener
+    const loadData = useCallback(() => {
+        if (!gymId) {
+            setMembers([]);
+            setPayments([]);
+            setVisitors([]);
+            return;
         }
-    });
-
-    useEffect(() => {
-        try {
-            localStorage.setItem('gymMembers', JSON.stringify(members));
-        } catch (error) {
-            console.error("Failed to save members to localStorage", error);
-        }
-    }, [members]);
-    
-    useEffect(() => {
-        try {
-            localStorage.setItem('gymPayments', JSON.stringify(payments));
-        } catch (error) {
-            console.error("Failed to save payments to localStorage", error);
-        }
-    }, [payments]);
-
-    const addMember = useCallback((memberData: Omit<Member, 'id'>, paymentMethod: Payment['method']) => {
-        const newMember: Member = {
-            id: `m${Date.now()}`,
-            ...memberData,
-            remindersEnabled: memberData.remindersEnabled ?? true,
-        };
         
-        let newPayment: Payment | null = null;
-        if (newMember.feePaid) {
-            newPayment = {
-                id: `p${Date.now()}`,
+        // 1. Load Gym Metadata (for name)
+        const gyms = JSON.parse(localStorage.getItem('saas_gyms') || '[]');
+        const currentGym = gyms.find((g: Gym) => g.id === gymId);
+        if (currentGym) setGymName(currentGym.name);
+
+        // 2. Load Gym Data
+        const mems = JSON.parse(localStorage.getItem(`gym_${gymId}_members`) || '[]');
+        const pays = JSON.parse(localStorage.getItem(`gym_${gymId}_payments`) || '[]');
+        const visits = JSON.parse(localStorage.getItem(`gym_${gymId}_visitors`) || '[]');
+
+        setMembers(mems);
+        setPayments(pays);
+        setVisitors(visits);
+    }, [gymId]);
+
+    useEffect(() => {
+        loadData();
+        // Listen for custom storage events to trigger re-renders across components
+        const handleStorageChange = () => loadData();
+        window.addEventListener('saas_storage_update', handleStorageChange);
+        return () => window.removeEventListener('saas_storage_update', handleStorageChange);
+    }, [loadData]);
+
+    const notifyUpdate = () => {
+        window.dispatchEvent(new Event('saas_storage_update'));
+    };
+
+    const addMember = (member: Omit<Member, 'id' | 'gymId'>) => {
+        if (!gymId) return;
+        const newMember: Member = {
+            ...member,
+            id: `m_${Date.now()}`,
+            gymId: gymId,
+            remindersEnabled: true,
+            attendance: {}
+        };
+        const updatedMembers = [...members, newMember];
+        localStorage.setItem(`gym_${gymId}_members`, JSON.stringify(updatedMembers));
+        
+        // Initial fee record if paid
+        if (member.feePaid) {
+            recordPayment({
+                amount: member.fee,
+                method: 'Cash', // default
                 memberId: newMember.id,
                 memberName: newMember.name,
-                date: new Date().toISOString().split('T')[0],
-                amount: newMember.fee,
-                method: paymentMethod,
-            };
+                date: new Date().toISOString().split('T')[0]
+            });
+        } else {
+            notifyUpdate();
         }
+    };
 
-        setMembers(prev => [...prev, newMember]);
-        if (newPayment) {
-            setPayments(prev => [...prev, newPayment!]);
-        }
-    }, []);
+    const updateMember = (updated: Member) => {
+        if (!gymId) return;
+        const updatedList = members.map(m => m.id === updated.id ? updated : m);
+        localStorage.setItem(`gym_${gymId}_members`, JSON.stringify(updatedList));
+        notifyUpdate();
+    };
 
-    const updateMember = useCallback((updatedMember: Member, paymentMethod: Payment['method']) => {
-        setMembers(prev => {
-            const oldMember = prev.find(m => m.id === updatedMember.id);
-            if (oldMember && !oldMember.feePaid && updatedMember.feePaid) {
-                // Member just paid, record payment
-                 const newPayment: Payment = {
-                    id: `p${Date.now()}`,
-                    memberId: updatedMember.id,
-                    memberName: updatedMember.name,
-                    date: new Date().toISOString().split('T')[0],
-                    amount: updatedMember.fee,
-                    method: paymentMethod,
-                };
-                setPayments(p => [...p, newPayment]);
+    const deleteMember = (id: string) => {
+        if (!gymId) return;
+        const updatedList = members.filter(m => m.id !== id);
+        localStorage.setItem(`gym_${gymId}_members`, JSON.stringify(updatedList));
+        notifyUpdate();
+    };
+
+    const recordPayment = (payment: Omit<Payment, 'id' | 'gymId'>) => {
+        if (!gymId) return;
+        const newPayment: Payment = {
+            ...payment,
+            id: `p_${Date.now()}`,
+            gymId: gymId
+        };
+        const updatedPayments = [...payments, newPayment];
+        localStorage.setItem(`gym_${gymId}_payments`, JSON.stringify(updatedPayments));
+        notifyUpdate();
+    };
+
+    const updatePayment = (updated: Payment) => {
+        if (!gymId) return;
+        const updatedList = payments.map(p => p.id === updated.id ? updated : p);
+        localStorage.setItem(`gym_${gymId}_payments`, JSON.stringify(updatedList));
+        notifyUpdate();
+    };
+
+    const deletePayment = (id: string) => {
+        if (!gymId) return;
+        const updatedList = payments.filter(p => p.id !== id);
+        localStorage.setItem(`gym_${gymId}_payments`, JSON.stringify(updatedList));
+        notifyUpdate();
+    };
+
+    const markAttendance = (memberIds: string[], date: string, present: boolean) => {
+        if (!gymId) return;
+        const updatedMembers = members.map(m => {
+            if (memberIds.includes(m.id)) {
+                return { ...m, attendance: { ...m.attendance, [date]: present } };
             }
-            return prev.map(m => m.id === updatedMember.id ? { ...m, ...updatedMember } : m);
+            return m;
         });
-    }, []);
+        localStorage.setItem(`gym_${gymId}_members`, JSON.stringify(updatedMembers));
+        notifyUpdate();
+    };
 
-    const deleteMember = useCallback((id: string) => {
-        setMembers(prev => prev.filter(m => m.id !== id));
-    }, []);
+    const updateGymSettings = (settings: Partial<Gym>) => {
+        if (!gymId) return;
+        const gyms = JSON.parse(localStorage.getItem('saas_gyms') || '[]');
+        const updatedGyms = gyms.map((g: Gym) => g.id === gymId ? { ...g, ...settings } : g);
+        localStorage.setItem('saas_gyms', JSON.stringify(updatedGyms));
+        notifyUpdate();
+    };
 
-    const deletePayment = useCallback((id: string) => {
-        setPayments(prev => prev.filter(p => p.id !== id));
-    }, []);
+    const addVisitor = (visitor: Omit<Visitor, 'id' | 'gymId'>) => {
+        if (!gymId) return;
+        const newVisitor: Visitor = {
+            ...visitor,
+            id: `v_${Date.now()}`,
+            gymId: gymId
+        };
+        const updatedVisitors = [...visitors, newVisitor];
+        localStorage.setItem(`gym_${gymId}_visitors`, JSON.stringify(updatedVisitors));
+        notifyUpdate();
+    };
 
-    const updateAttendance = useCallback((memberId: string, date: string, present: boolean) => {
-        setMembers(prev => prev.map(m =>
-            m.id === memberId
-                ? { ...m, attendance: { ...m.attendance, [date]: present } }
-                : m
-        ));
-    }, []);
-    
-    const toggleReminder = useCallback((memberId: string, enabled: boolean) => {
-        setMembers(prev => prev.map(m => 
-            m.id === memberId 
-                ? { ...m, remindersEnabled: enabled }
-                : m
-        ));
-    }, []);
+    const deleteVisitor = (id: string) => {
+        if (!gymId) return;
+        const updatedVisitors = visitors.filter(v => v.id !== id);
+        localStorage.setItem(`gym_${gymId}_visitors`, JSON.stringify(updatedVisitors));
+        notifyUpdate();
+    };
 
     return {
+        gymName,
         members,
         payments,
+        visitors,
         addMember,
         updateMember,
         deleteMember,
+        recordPayment,
+        updatePayment,
         deletePayment,
-        updateAttendance,
-        toggleReminder
+        markAttendance,
+        updateGymSettings,
+        addVisitor,
+        deleteVisitor
     };
 };

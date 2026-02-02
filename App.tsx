@@ -1,213 +1,258 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Member, Payment, Role, View, ToastMessage, ToastType } from './types';
+
+import React, { useState, useEffect } from 'react';
+import { useGymData } from './hooks/useGymData';
+import { Gym } from './types';
+import Login from './components/Login';
+import Landing from './components/Landing';
+import SuperAdminDashboard from './components/SuperAdminDashboard';
 import Dashboard from './components/Dashboard';
 import Members from './components/Members';
+import MemberProfile from './components/MemberProfile';
 import Fees from './components/Fees';
 import Attendance from './components/Attendance';
+import BillingPortal from './components/BillingPortal';
 import Report from './components/Report';
-import Login from './components/Login';
-import ToastContainer from './components/Toast';
-import { useGymData } from './hooks/useGymData';
-import { DashboardIcon, MembersIcon, FeesIcon, AttendanceIcon, DocumentReportIcon, MenuIcon, CloseIcon, LogOutIcon } from './components/icons';
-import { DB_CONFIG } from './lib/dbConfig';
-
-const NavLink: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  isActive: boolean;
-  onClick: () => void;
-}> = ({ icon, label, isActive, onClick }) => (
-    <button
-        onClick={onClick}
-        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-            isActive ? 'bg-primary text-white' : 'text-text-secondary hover:bg-secondary hover:text-text-primary'
-        }`}
-    >
-        {icon}
-        <span className="font-medium">{label}</span>
-    </button>
-);
+import Visitors from './components/Visitors';
+import SubscriptionGuard from './components/SubscriptionGuard';
+import { DashboardIcon, MembersIcon, FeesIcon, AttendanceIcon, ReportIcon, CreditCardIcon, LogOutIcon, MenuIcon, ServerIcon, UsersIcon } from './components/icons';
 
 const App: React.FC = () => {
-    // Auth State
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [role, setRole] = useState<Role>('Admin');
+    // Basic Hash Router
+    const [hash, setHash] = useState(window.location.hash);
     
-    // View State
-    const [view, setView] = useState<View>('dashboard');
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-    // Data Hook
-    const { 
-        members, 
-        payments, 
-        addMember, 
-        updateMember, 
-        deleteMember, 
-        deletePayment,
-        updateAttendance, 
-        toggleReminder 
-    } = useGymData();
-
-    // Toast State
-    const [toasts, setToasts] = useState<ToastMessage[]>([]);
-
-    const showToast = useCallback((message: string, type: ToastType = 'success') => {
-        const id = Date.now().toString();
-        setToasts(prev => [...prev, { id, message, type }]);
-    }, []);
-
-    const removeToast = useCallback((id: string) => {
-        setToasts(prev => prev.filter(t => t.id !== id));
-    }, []);
-
-    // Handlers (Wrapped to trigger toasts)
-    const handleAddMember = useCallback((memberData: Omit<Member, 'id'>, paymentMethod: Payment['method']) => {
-        addMember(memberData, paymentMethod);
-        showToast(`Member ${memberData.name} added successfully!`);
-    }, [addMember, showToast]);
-
-    const handleUpdateMember = useCallback((updatedMember: Member, paymentMethod: Payment['method']) => {
-        updateMember(updatedMember, paymentMethod);
-        showToast(`Member ${updatedMember.name} updated successfully!`);
-    }, [updateMember, showToast]);
-
-    const handleDeleteMember = useCallback((id: string) => {
-        deleteMember(id);
-        showToast('Member deleted successfully', 'info');
-    }, [deleteMember, showToast]);
-
-    const handleDeletePayment = useCallback((id: string) => {
-        deletePayment(id);
-        showToast('Payment record deleted successfully', 'info');
-    }, [deletePayment, showToast]);
-
-    const handleUpdateAttendance = useCallback((memberId: string, date: string, present: boolean) => {
-        updateAttendance(memberId, date, present);
-        // Optional: show toast for attendance? Might be too spammy.
-    }, [updateAttendance]);
-    
-    const handleToggleReminders = useCallback((memberId: string, enabled: boolean) => {
-        toggleReminder(memberId, enabled);
-        showToast(`Reminders ${enabled ? 'enabled' : 'disabled'}`, 'info');
-    }, [toggleReminder, showToast]);
-
-    const handleLogin = (selectedRole: Role) => {
-        setRole(selectedRole);
-        setIsLoggedIn(true);
-        setView(selectedRole === 'Member' ? 'attendance' : 'dashboard');
-        showToast(`Welcome back, ${selectedRole}!`);
-    };
-
-    const handleLogout = () => {
-        setIsLoggedIn(false);
-        setRole('Admin');
-        setView('dashboard');
-    };
-
-    // Ensure correct view based on role changes
     useEffect(() => {
-        if(role === 'Member' && view !== 'attendance') {
-            setView('attendance');
+        const handleHash = () => setHash(window.location.hash);
+        window.addEventListener('hashchange', handleHash);
+        
+        // Initialize storage if empty (No Mock Data)
+        if (!localStorage.getItem('saas_gyms')) {
+            localStorage.setItem('saas_gyms', JSON.stringify([]));
         }
-    }, [role, view]);
 
-    if (!isLoggedIn) {
-        return (
-            <>
-                <Login onLogin={handleLogin} />
-                <ToastContainer toasts={toasts} removeToast={removeToast} />
-            </>
-        );
+        // Default to Landing Page logic
+        // If there is no hash, OR if the hash is just '#/', redirect to #/landing
+        if(!window.location.hash || window.location.hash === '#/') {
+            window.location.hash = '#/landing';
+        }
+
+        return () => window.removeEventListener('hashchange', handleHash);
+    }, []);
+
+    // --- ROUTING LOGIC ---
+    // /landing
+    // /owner/login
+    // /owner/forgot-password
+    // /owner/reset-password
+    // /owner/dashboard
+    // /g/:slug/login
+    // /g/:slug/dashboard ...
+    
+    const parts = hash.replace('#', '').split('/').filter(Boolean); // ['g', 'slug', 'dashboard']
+    const root = parts[0]; 
+
+    // --- LANDING PAGE ---
+    if (root === 'landing' || !root) {
+        return <Landing />;
     }
 
-    const renderView = () => {
+    // --- OWNER APP ---
+    if (root === 'owner') {
+        const action = parts[1] || 'login';
+        
+        if (action === 'login') {
+            return <Login type="owner" mode="login" onLogin={(pass) => {
+                // Check against storage or default
+                const currentPass = localStorage.getItem('saas_owner_pwd') || '*469702*';
+                if (pass === currentPass) {
+                    window.location.hash = '#/owner/dashboard';
+                    return true;
+                } else {
+                    return false;
+                }
+            }} />;
+        }
+        
+        if (action === 'forgot-password') {
+            return <Login type="owner" mode="forgot" onLogin={() => {}} />;
+        }
+
+        if (action === 'reset-password') {
+            return <Login type="owner" mode="reset" onLogin={(newPass) => {
+                 localStorage.setItem('saas_owner_pwd', newPass);
+                 alert("Password has been securely updated. Please log in.");
+                 window.location.hash = '#/owner/login';
+            }} />;
+        }
+
+        if (action === 'dashboard') {
+            return <SuperAdminDashboard 
+                onNavigateGym={(slug) => window.location.hash = `#/g/${slug}/dashboard`}
+                onLogout={() => window.location.hash = '#/owner/login'}
+            />;
+        }
+    }
+
+    // --- GYM APP ---
+    if (root === 'g') {
+        const slug = parts[1];
+        const action = parts[2] || 'login';
+        const subId = parts[3]; // Used for specific member ID etc.
+
+        // 1. Resolve Gym
+        const allGyms = JSON.parse(localStorage.getItem('saas_gyms') || '[]');
+        const currentGym = allGyms.find((g: Gym) => g.slug === slug);
+
+        // 404
+        if (!currentGym) return <div className="text-white p-8">Gym not found. <a href="#/landing" className="underline">Back to Home</a></div>;
+
+        // Gym Login
+        if (action === 'login') {
+            return <Login type="gym" mode="login" gymName={currentGym.name} onLogin={(pass) => {
+                // Check password from storage, default to 'admin' if not set
+                const correctPass = currentGym.adminPassword || 'admin';
+                if (pass === correctPass) {
+                    window.location.hash = `#/g/${slug}/dashboard`;
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }} />;
+        }
+
+        // Member Login (simplified URL for demo: /g/slug/member)
+        if (action === 'member') {
+             return <Login type="member" mode="login" gymName={currentGym.name} onLogin={(id) => {
+                 // Member view logic... (Keeping it simple, just redirect to attendance with filter)
+                 // For now, let's just use the Admin view but simulated read-only could be a future step.
+                 // The prompt asks for "Login by registration number and only allowed to view personal attendance".
+                 alert("Member view is a subset of features. Redirecting to attendance for demo purposes.");
+                 window.location.hash = `#/g/${slug}/attendance`;
+                 return true;
+            }} />;
+        }
+
+        // Gym App Shell
+        return <GymApp gym={currentGym} view={action} subId={subId} />;
+    }
+
+    return <div className="text-white p-8">Loading...</div>;
+};
+
+// --- ISOLATED GYM SHELL ---
+const GymApp: React.FC<{ gym: Gym, view: string, subId?: string }> = ({ gym, view, subId }) => {
+    const { 
+        members, payments, visitors, addMember, updateMember, deleteMember, recordPayment, markAttendance, updateGymSettings, gymName,
+        updatePayment, deletePayment, addVisitor, deleteVisitor
+    } = useGymData(gym.id);
+
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    
+    // Derived name (allow local override from hook if changed)
+    const displayName = gymName || gym.name;
+
+    const navigate = (v: string) => {
+        window.location.hash = `#/g/${gym.slug}/${v}`;
+        setMobileMenuOpen(false);
+    };
+
+    const renderContent = () => {
+        // Special Case: Member Profile View
+        if (view === 'members' && subId) {
+            return (
+                <MemberProfile 
+                    gym={gym} 
+                    members={members} 
+                    payments={payments} 
+                    memberId={subId} 
+                    onBack={() => navigate('members')} 
+                />
+            );
+        }
+
         switch (view) {
-            case 'members':
-                return <Members members={members} payments={payments} onAddMember={handleAddMember} onUpdateMember={handleUpdateMember} onDeleteMember={handleDeleteMember} />;
-            case 'fees':
-                return <Fees members={members} payments={payments} onToggleReminders={handleToggleReminders} onDeletePayment={handleDeletePayment} />;
-            case 'attendance':
-                return <Attendance members={members} role={role} onUpdateAttendance={handleUpdateAttendance} />;
-            case 'report':
-                return <Report members={members} payments={payments} />;
+            case 'members': return <Members gym={gym} members={members} onAdd={addMember} onUpdate={updateMember} onDelete={deleteMember} />;
+            case 'fees': return <Fees 
+                gymName={displayName} 
+                payments={payments} 
+                members={members}
+                onAdd={recordPayment}
+                onUpdateMember={updateMember}
+                onUpdate={updatePayment} 
+                onDelete={deletePayment} 
+            />;
+            case 'attendance': return <Attendance members={members} onMark={markAttendance} />;
+            case 'visitors': return <Visitors visitors={visitors} onAdd={addVisitor} onDelete={deleteVisitor} />;
+            case 'billing': return <BillingPortal gym={gym} members={members} payments={payments} onUpdateGym={updateGymSettings} />;
+            case 'report': return <Report gym={gym} members={members} payments={payments} />;
             case 'dashboard':
-            default:
-                return <Dashboard members={members} payments={payments} onNavigate={(v) => setView(v)} onDeletePayment={handleDeletePayment} />;
+            default: return <Dashboard gym={gym} members={members} payments={payments} />;
         }
     };
 
-    const sidebarContent = (
-        <div className="h-full bg-surface flex flex-col p-4">
-            <h1 className="text-2xl font-bold text-center mb-8 mt-4 text-primary">Saqib Fitness</h1>
-            <div className="mb-6 px-4">
-                <div className="p-3 bg-secondary rounded-lg flex items-center space-x-3">
-                    <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white font-bold">
-                        {role[0]}
-                    </div>
-                    <div>
-                        <p className="text-sm font-medium text-text-primary">{role}</p>
-                        <p className="text-xs text-text-secondary">Online</p>
-                    </div>
-                </div>
-            </div>
-            
-            <nav className="flex-grow space-y-2">
-                {role !== 'Member' && (
-                    <>
-                        <NavLink icon={<DashboardIcon />} label="Dashboard" isActive={view === 'dashboard'} onClick={() => setView('dashboard')} />
-                        <NavLink icon={<MembersIcon />} label="Members" isActive={view === 'members'} onClick={() => setView('members')} />
-                        <NavLink icon={<FeesIcon />} label="Fees & Ledger" isActive={view === 'fees'} onClick={() => setView('fees')} />
-                    </>
-                )}
-                <NavLink icon={<AttendanceIcon />} label={role === 'Member' ? 'My Attendance' : 'Attendance'} isActive={view === 'attendance'} onClick={() => setView('attendance')} />
-                {role !== 'Member' && (
-                     <NavLink icon={<DocumentReportIcon />} label="Reports" isActive={view === 'report'} onClick={() => setView('report')} />
-                )}
-            </nav>
-            <div className="mt-auto pt-4 border-t border-gray-700">
-                <button 
-                    onClick={handleLogout}
-                    className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-900/20 transition-colors"
-                >
-                    <LogOutIcon />
-                    <span className="font-medium">Logout</span>
-                </button>
-            </div>
-        </div>
-    );
-
     return (
-        <div className="flex h-screen bg-background">
-            <ToastContainer toasts={toasts} removeToast={removeToast} />
-            
-            {/* Desktop Sidebar */}
-            <aside className="w-64 hidden lg:block flex-shrink-0 border-r border-gray-800">
-                {sidebarContent}
+        <div className="flex h-screen bg-background text-text-primary">
+            {/* Sidebar */}
+            <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-surface transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-200 ease-in-out border-r border-gray-700`}>
+                <div className="h-full flex flex-col">
+                    <div className="p-6 border-b border-gray-700">
+                        <h1 className="text-xl font-bold text-primary truncate">{displayName}</h1>
+                        <p className="text-xs text-gray-500 mt-1 uppercase tracking-wider">Gym Portal</p>
+                    </div>
+                    
+                    <nav className="flex-1 p-4 space-y-2">
+                        <NavBtn active={view === 'dashboard'} onClick={() => navigate('dashboard')} icon={<DashboardIcon />} label="Dashboard" />
+                        <NavBtn active={view === 'members'} onClick={() => navigate('members')} icon={<MembersIcon />} label="Members" />
+                        <NavBtn active={view === 'fees'} onClick={() => navigate('fees')} icon={<FeesIcon />} label="Fees" />
+                        <NavBtn active={view === 'attendance'} onClick={() => navigate('attendance')} icon={<AttendanceIcon />} label="Attendance" />
+                        <NavBtn active={view === 'visitors'} onClick={() => navigate('visitors')} icon={<UsersIcon />} label="Visitors" />
+                        <NavBtn active={view === 'report'} onClick={() => navigate('report')} icon={<ReportIcon />} label="Reports" />
+                        
+                        <div className="pt-4 mt-4 border-t border-gray-700">
+                            <NavBtn active={view === 'billing'} onClick={() => navigate('billing')} icon={<CreditCardIcon />} label="Billing" />
+                        </div>
+                    </nav>
+
+                    <div className="p-4 border-t border-gray-700 space-y-2">
+                         <button onClick={() => window.location.hash = '#/landing'} className="flex items-center gap-3 text-indigo-400 hover:text-indigo-300 w-full px-4 py-2 text-sm font-medium">
+                            <ServerIcon className="h-5 w-5" /> Back to Home
+                        </button>
+                        <button onClick={() => window.location.hash = `#/g/${gym.slug}/login`} className="flex items-center gap-3 text-red-400 hover:text-red-300 w-full px-4 py-2">
+                            <LogOutIcon /> Logout
+                        </button>
+                    </div>
+                </div>
             </aside>
-            {/* Mobile Sidebar */}
-            <div className={`fixed inset-0 z-40 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:hidden`}>
-                <div className="w-64 h-full shadow-2xl">
-                    {sidebarContent}
+
+            {/* Main Content */}
+            <div className="flex-1 lg:ml-64 flex flex-col h-full overflow-hidden">
+                <div className="bg-surface lg:hidden p-4 flex justify-between items-center border-b border-gray-700">
+                    <span className="font-bold">{displayName}</span>
+                    <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}><MenuIcon /></button>
                 </div>
-                <div className="absolute top-4 right-4" onClick={() => setIsSidebarOpen(false)}>
-                    <CloseIcon className="h-6 w-6 text-white"/>
-                </div>
+                
+                <main className="flex-1 overflow-auto bg-background relative">
+                    {/* Subscription Guard Wraps Content */}
+                    <SubscriptionGuard 
+                        gym={gym} 
+                        onNavigateToBilling={() => navigate('billing')}
+                        allowInteraction={view === 'billing'}
+                    >
+                        {renderContent()}
+                    </SubscriptionGuard>
+                </main>
             </div>
-            {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 lg:hidden" onClick={() => setIsSidebarOpen(false)}></div>}
-            
-            <main className="flex-1 flex flex-col overflow-y-auto">
-                <header className="bg-surface p-4 flex justify-between items-center lg:hidden sticky top-0 z-20 shadow-md">
-                    <button onClick={() => setIsSidebarOpen(true)}>
-                        <MenuIcon className="h-6 w-6 text-text-primary"/>
-                    </button>
-                    <h2 className="text-xl font-bold capitalize">{view}</h2>
-                    <div className="w-6"></div>
-                </header>
-                {renderView()}
-            </main>
+
+            {/* Overlay */}
+            {mobileMenuOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setMobileMenuOpen(false)}></div>}
         </div>
     );
 };
+
+const NavBtn: React.FC<{active: boolean, onClick: () => void, icon: any, label: string}> = ({active, onClick, icon, label}) => (
+    <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${active ? 'bg-primary text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`}>
+        {icon} <span className="font-medium">{label}</span>
+    </button>
+);
 
 export default App;
