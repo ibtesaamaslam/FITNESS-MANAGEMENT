@@ -11,7 +11,10 @@ const Attendance: React.FC<Props> = ({ members, onMark }) => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [filter, setFilter] = useState('');
 
-    const filtered = members.filter(m => m.name.toLowerCase().includes(filter.toLowerCase()));
+    const filtered = members.filter(m => 
+        m.name.toLowerCase().includes(filter.toLowerCase()) || 
+        m.registrationNo.toLowerCase().includes(filter.toLowerCase())
+    );
 
     // Calculate Stats for the selected date (based on ALL members, not just filtered)
     const totalMembers = members.length;
@@ -75,7 +78,7 @@ const Attendance: React.FC<Props> = ({ members, onMark }) => {
                 </div>
                 <div className="flex-grow">
                     <input 
-                        placeholder="Search members by name..." 
+                        placeholder="Search by name or reg no..." 
                         value={filter} 
                         onChange={e => setFilter(e.target.value)} 
                         className="w-full bg-background p-2 rounded text-white border border-gray-600 outline-none focus:border-primary text-sm" 
