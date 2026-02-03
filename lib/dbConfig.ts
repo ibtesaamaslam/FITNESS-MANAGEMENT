@@ -1,24 +1,21 @@
-
-// ⚠️ SECURITY WARNING: 
-// This file contains sensitive database credentials.
-// It is strictly for reference or server-side scripts (Node.js/Python).
-// DO NOT import this file into client-side components (React), or your password will be exposed to the public.
+// Configuration for PostgreSQL database
+// Note: Direct connection from browser to port 5432 is not supported due to security sandboxing.
+// These credentials are preserved here for future backend integration (e.g., Node.js, Python, or Supabase Client).
 
 export const DB_CONFIG = {
-  host: 'db.btbtfehrfcyakfcpefey.supabase.co',
+  host: 'db.lvthagphtyigzwjwuzpd.supabase.co',
   port: 5432,
   database: 'postgres',
   user: 'postgres',
-  password: 'DFxMaukIgZwhTbzV' 
+  // password: [YOUR_PASSWORD] 
 };
 
-export const CONNECTION_STRINGS = {
-  // Use this for Transaction Pooler (IPv4 compatible, best for serverless functions)
-  pooler: "postgres://postgres.btbtfehrfcyakfcpefey:DFxMaukIgZwhTbzV@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true",
-  
-  // Use this for Direct Connection (Session Mode)
-  direct: "postgres://postgres.btbtfehrfcyakfcpefey:DFxMaukIgZwhTbzV@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require"
-};
+// To use this database, you would typically use a backend server:
+// const { Pool } = require('pg');
+// const pool = new Pool(DB_CONFIG);
 
-// ⚠️ SERVICE ROLE KEY (SUPER ADMIN ACCESS - DO NOT USE IN FRONTEND)
-// SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0YnRmZWhyZmN5YWtmY3BlZmV5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDExMTM5MiwiZXhwIjoyMDg1Njg3MzkyfQ.Aj0Yye0LyBqSkVW9yuV6NBWm6XhovcHkPV-UkJriSnI"
+// Or use the Supabase JS Client with project URL:
+// const supabaseUrl = 'https://lvthagphtyigzwjwuzpd.supabase.co'
+// const supabaseKey = 'YOUR_SUPABASE_ANON_KEY'
+// import { createClient } from '@supabase/supabase-js'
+// const supabase = createClient(supabaseUrl, supabaseKey)

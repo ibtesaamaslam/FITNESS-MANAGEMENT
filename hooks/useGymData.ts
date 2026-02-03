@@ -1,213 +1,119 @@
-
 import { useState, useEffect, useCallback } from 'react';
-import { Member, Payment, Gym, Visitor } from '../types';
-import { supabase } from '../lib/supabase';
+import { Member, Payment } from '../types';
 
-export const useGymData = (gymId: string | undefined) => {
-    const [members, setMembers] = useState<Member[]>([]);
-    const [payments, setPayments] = useState<Payment[]>([]);
-    const [visitors, setVisitors] = useState<Visitor[]>([]);
-    const [gymName, setGymName] = useState<string>('');
-    const [loading, setLoading] = useState(true);
-
-    const loadData = useCallback(async () => {
-        if (!gymId) return;
-        setLoading(true);
-
+export const useGymData = () => {
+    const [members, setMembers] = useState<Member[]>(() => {
         try {
-            // 1. Fetch Gym Details
-            const { data: gymData } = await supabase
-                .from('gyms')
-                .select('name')
-                .eq('id', gymId)
-                .single();
-            
-            if (gymData) setGymName(gymData.name);
-
-            // 2. Fetch Members
-            const { data: memData } = await supabase
-                .from('members')
-                .select('*')
-                .eq('gymId', gymId);
-            if (memData) setMembers(memData);
-
-            // 3. Fetch Payments
-            const { data: payData } = await supabase
-                .from('payments')
-                .select('*')
-                .eq('gymId', gymId);
-            if (payData) setPayments(payData);
-
-            // 4. Fetch Visitors
-            const { data: visData } = await supabase
-                .from('visitors')
-                .select('*')
-                .eq('gymId', gymId);
-            if (visData) setVisitors(visData);
-
+            const storedMembers = localStorage.getItem('gymMembers');
+            return storedMembers ? JSON.parse(storedMembers) : [];
         } catch (error) {
-            console.error("Error loading gym data:", error);
-        } finally {
-            setLoading(false);
+            console.error("Failed to parse members from localStorage", error);
+            return [];
         }
-    }, [gymId]);
+    });
 
-    // Initial Load & Realtime Subscription
+    const [payments, setPayments] = useState<Payment[]>(() => {
+        try {
+            const storedPayments = localStorage.getItem('gymPayments');
+            return storedPayments ? JSON.parse(storedPayments) : [];
+        } catch (error) {
+            console.error("Failed to parse payments from localStorage", error);
+            return [];
+        }
+    });
+
     useEffect(() => {
-        loadData();
+        try {
+            localStorage.setItem('gymMembers', JSON.stringify(members));
+        } catch (error) {
+            console.error("Failed to save members to localStorage", error);
+        }
+    }, [members]);
+    
+    useEffect(() => {
+        try {
+            localStorage.setItem('gymPayments', JSON.stringify(payments));
+        } catch (error) {
+            console.error("Failed to save payments to localStorage", error);
+        }
+    }, [payments]);
 
-        if (!gymId) return;
-
-        // Subscribe to changes for this Gym
-        const channel = supabase.channel(`gym_${gymId}`)
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'members', filter: `gymId=eq.${gymId}` },
-                (payload) => {
-                    if (payload.eventType === 'INSERT') setMembers(prev => [...prev, payload.new as Member]);
-                    if (payload.eventType === 'UPDATE') setMembers(prev => prev.map(m => m.id === payload.new.id ? payload.new as Member : m));
-                    if (payload.eventType === 'DELETE') setMembers(prev => prev.filter(m => m.id !== payload.old.id));
-                }
-            )
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'payments', filter: `gymId=eq.${gymId}` },
-                (payload) => {
-                    if (payload.eventType === 'INSERT') setPayments(prev => [...prev, payload.new as Payment]);
-                    if (payload.eventType === 'UPDATE') setPayments(prev => prev.map(p => p.id === payload.new.id ? payload.new as Payment : p));
-                    if (payload.eventType === 'DELETE') setPayments(prev => prev.filter(p => p.id !== payload.old.id));
-                }
-            )
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'visitors', filter: `gymId=eq.${gymId}` },
-                (payload) => {
-                    if (payload.eventType === 'INSERT') setVisitors(prev => [...prev, payload.new as Visitor]);
-                    if (payload.eventType === 'DELETE') setVisitors(prev => prev.filter(v => v.id !== payload.old.id));
-                }
-            )
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'gyms', filter: `id=eq.${gymId}` },
-                (payload) => {
-                   if(payload.new.name) setGymName(payload.new.name);
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
+    const addMember = useCallback((memberData: Omit<Member, 'id'>, paymentMethod: Payment['method']) => {
+        const newMember: Member = {
+            id: `m${Date.now()}`,
+            ...memberData,
+            remindersEnabled: memberData.remindersEnabled ?? true,
         };
-    }, [gymId, loadData]);
-
-    // --- ACTIONS ---
-
-    const addMember = async (member: Omit<Member, 'id' | 'gymId'>) => {
-        if (!gymId) return;
-        const newId = crypto.randomUUID();
-        const newMember: Member = { ...member, id: newId, gymId, attendance: {} };
-
-        // Optimistic Update
-        setMembers(prev => [...prev, newMember]);
-
-        const { error } = await supabase.from('members').insert([newMember]);
-        if (error) console.error("Error adding member:", error);
-
-        // Record initial payment if needed
-        if (member.feePaid) {
-            recordPayment({
-                amount: member.fee,
-                method: 'Cash',
-                memberId: newId,
+        
+        let newPayment: Payment | null = null;
+        if (newMember.feePaid) {
+            newPayment = {
+                id: `p${Date.now()}`,
+                memberId: newMember.id,
                 memberName: newMember.name,
-                date: new Date().toISOString().split('T')[0]
-            });
+                date: new Date().toISOString().split('T')[0],
+                amount: newMember.fee,
+                method: paymentMethod,
+            };
         }
-    };
 
-    const updateMember = async (updated: Member) => {
-        // Optimistic
-        setMembers(prev => prev.map(m => m.id === updated.id ? updated : m));
-        await supabase.from('members').update(updated).eq('id', updated.id);
-    };
+        setMembers(prev => [...prev, newMember]);
+        if (newPayment) {
+            setPayments(prev => [...prev, newPayment!]);
+        }
+    }, []);
 
-    const deleteMember = async (id: string) => {
-        // Optimistic
-        setMembers(prev => prev.filter(m => m.id !== id));
-        await supabase.from('members').delete().eq('id', id);
-    };
-
-    const recordPayment = async (payment: Omit<Payment, 'id' | 'gymId'>) => {
-        if (!gymId) return;
-        const newPayment = { ...payment, id: crypto.randomUUID(), gymId };
-        
-        // Optimistic
-        setPayments(prev => [...prev, newPayment]);
-        await supabase.from('payments').insert([newPayment]);
-    };
-
-    const updatePayment = async (updated: Payment) => {
-        setPayments(prev => prev.map(p => p.id === updated.id ? updated : p));
-        await supabase.from('payments').update(updated).eq('id', updated.id);
-    };
-
-    const deletePayment = async (id: string) => {
-        setPayments(prev => prev.filter(p => p.id !== id));
-        await supabase.from('payments').delete().eq('id', id);
-    };
-
-    const markAttendance = async (memberIds: string[], date: string, present: boolean) => {
-        const membersToUpdate = members.filter(m => memberIds.includes(m.id));
-        
-        // Optimistic
-        setMembers(prev => prev.map(m => {
-            if (memberIds.includes(m.id)) {
-                return { ...m, attendance: { ...m.attendance, [date]: present } };
+    const updateMember = useCallback((updatedMember: Member, paymentMethod: Payment['method']) => {
+        setMembers(prev => {
+            const oldMember = prev.find(m => m.id === updatedMember.id);
+            if (oldMember && !oldMember.feePaid && updatedMember.feePaid) {
+                // Member just paid, record payment
+                 const newPayment: Payment = {
+                    id: `p${Date.now()}`,
+                    memberId: updatedMember.id,
+                    memberName: updatedMember.name,
+                    date: new Date().toISOString().split('T')[0],
+                    amount: updatedMember.fee,
+                    method: paymentMethod,
+                };
+                setPayments(p => [...p, newPayment]);
             }
-            return m;
-        }));
+            return prev.map(m => m.id === updatedMember.id ? { ...m, ...updatedMember } : m);
+        });
+    }, []);
 
-        // DB Update (Looping primarily because jsonb partial updates are tricky in bulk without an RPC, 
-        // simple loop is fine for small batches)
-        for (const m of membersToUpdate) {
-            const updatedAttendance = { ...m.attendance, [date]: present };
-            await supabase.from('members').update({ attendance: updatedAttendance }).eq('id', m.id);
-        }
-    };
+    const deleteMember = useCallback((id: string) => {
+        setMembers(prev => prev.filter(m => m.id !== id));
+    }, []);
 
-    const updateGymSettings = async (settings: Partial<Gym>) => {
-        if (!gymId) return;
-        if (settings.name) setGymName(settings.name);
-        await supabase.from('gyms').update(settings).eq('id', gymId);
-    };
+    const deletePayment = useCallback((id: string) => {
+        setPayments(prev => prev.filter(p => p.id !== id));
+    }, []);
 
-    const addVisitor = async (visitor: Omit<Visitor, 'id' | 'gymId'>) => {
-        if (!gymId) return;
-        const newVisitor = { ...visitor, id: crypto.randomUUID(), gymId };
-        setVisitors(prev => [...prev, newVisitor]);
-        await supabase.from('visitors').insert([newVisitor]);
-    };
-
-    const deleteVisitor = async (id: string) => {
-        setVisitors(prev => prev.filter(v => v.id !== id));
-        await supabase.from('visitors').delete().eq('id', id);
-    };
+    const updateAttendance = useCallback((memberId: string, date: string, present: boolean) => {
+        setMembers(prev => prev.map(m =>
+            m.id === memberId
+                ? { ...m, attendance: { ...m.attendance, [date]: present } }
+                : m
+        ));
+    }, []);
+    
+    const toggleReminder = useCallback((memberId: string, enabled: boolean) => {
+        setMembers(prev => prev.map(m => 
+            m.id === memberId 
+                ? { ...m, remindersEnabled: enabled }
+                : m
+        ));
+    }, []);
 
     return {
-        gymName,
         members,
         payments,
-        visitors,
-        loading,
         addMember,
         updateMember,
         deleteMember,
-        recordPayment,
-        updatePayment,
         deletePayment,
-        markAttendance,
-        updateGymSettings,
-        addVisitor,
-        deleteVisitor
+        updateAttendance,
+        toggleReminder
     };
 };
