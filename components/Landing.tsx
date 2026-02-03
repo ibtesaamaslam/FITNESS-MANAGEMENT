@@ -1,20 +1,35 @@
 
 import React, { useState, useEffect } from 'react';
-import { Gym } from '../types';
-import { LockIcon, UserIcon, WarningIcon, UploadIcon } from './icons';
+import { supabase } from '../lib/supabase';
+import { LockIcon, UserIcon, WarningIcon, ServerIcon } from './icons';
 
 const Landing: React.FC = () => {
-    const [gyms, setGyms] = useState<Gym[]>([]);
     const [inputSlug, setInputSlug] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [sysStatus, setSysStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
+    // Check Backend Connection on Mount
     useEffect(() => {
-        const data = JSON.parse(localStorage.getItem('saas_gyms') || '[]');
-        setGyms(data);
+        const checkConnection = async () => {
+            try {
+                // Simple query to check if we can talk to the DB
+                const { error } = await supabase.from('gyms').select('id').limit(1);
+                if (error) {
+                    console.error('Supabase connection error:', error);
+                    setSysStatus('offline');
+                } else {
+                    setSysStatus('online');
+                }
+            } catch (err) {
+                setSysStatus('offline');
+            }
+        };
+        checkConnection();
     }, []);
 
-    const handleGo = (e: React.FormEvent) => {
+    const handleGo = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         
@@ -23,21 +38,31 @@ const Landing: React.FC = () => {
             return;
         }
 
-        // Clean slug
+        setLoading(true);
         const clean = inputSlug.toLowerCase().replace(/\s+/g, '-');
         
-        // Validate Gym & Password
-        const gym = gyms.find(g => g.slug === clean);
-        
-        if (gym) {
-            const correctPass = gym.adminPassword || 'admin';
-            if (password === correctPass) {
-                window.location.hash = `#/g/${clean}/dashboard`;
+        try {
+            // Check if gym exists and verify password
+            const { data: gym, error } = await supabase
+                .from('gyms')
+                .select('slug, adminPassword')
+                .eq('slug', clean)
+                .single();
+
+            if (error || !gym) {
+                setError("Gym ID not found.");
             } else {
-                setError("Incorrect Password");
+                const correctPass = gym.adminPassword || 'admin';
+                if (password === correctPass) {
+                    window.location.hash = `#/g/${clean}/dashboard`;
+                } else {
+                    setError("Incorrect Password");
+                }
             }
-        } else {
-            setError("Gym ID not found.");
+        } catch (err) {
+            setError("Connection failed.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -48,6 +73,25 @@ const Landing: React.FC = () => {
             <div className="absolute inset-0 z-0 pointer-events-none">
                 <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/10 rounded-full blur-[150px]"></div>
                 <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[150px]"></div>
+            </div>
+
+            {/* --- SYSTEM STATUS: TOP LEFT --- */}
+            <div className="fixed top-6 left-6 z-50 animate-fade-in">
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border backdrop-blur-md transition-colors ${
+                    sysStatus === 'online' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                    sysStatus === 'offline' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+                    'bg-gray-800/50 border-gray-700 text-gray-500'
+                }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                        sysStatus === 'online' ? 'bg-green-500 animate-pulse' :
+                        sysStatus === 'offline' ? 'bg-red-500' :
+                        'bg-gray-500'
+                    }`}></div>
+                    <span className="text-xs font-bold uppercase tracking-wider">
+                        {sysStatus === 'online' ? 'System Online' : 
+                         sysStatus === 'offline' ? 'System Offline' : 'Connecting...'}
+                    </span>
+                </div>
             </div>
 
             {/* --- SUPER ADMIN BUTTON: FIXED TOP RIGHT --- */}
@@ -126,8 +170,8 @@ const Landing: React.FC = () => {
                             </div>
                         )}
 
-                        <button className="w-full bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5 transition-all active:translate-y-0 active:shadow-sm text-lg">
-                            Access Dashboard
+                        <button disabled={loading} className="w-full bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5 transition-all active:translate-y-0 active:shadow-sm text-lg disabled:opacity-50">
+                            {loading ? 'Verifying...' : 'Access Dashboard'}
                         </button>
                     </form>
                 </div>

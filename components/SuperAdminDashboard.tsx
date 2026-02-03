@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Gym, SubscriptionStatus, Member, Payment } from '../types';
 import { TrashIcon, CloseIcon, EditIcon, SettingsIcon, WarningIcon, LogOutIcon, DatabaseIcon, DownloadIcon, UploadIcon } from './icons';
+import { supabase } from '../lib/supabase';
 
 interface Props {
   onNavigateGym: (slug: string) => void;
@@ -10,6 +11,7 @@ interface Props {
 
 const SuperAdminDashboard: React.FC<Props> = ({ onNavigateGym, onLogout }) => {
   const [gyms, setGyms] = useState<Gym[]>([]);
+  const [loading, setLoading] = useState(false);
   
   // Modals State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -35,28 +37,32 @@ const SuperAdminDashboard: React.FC<Props> = ({ onNavigateGym, onLogout }) => {
   });
   const [slugTouched, setSlugTouched] = useState(false);
 
-  // Load gyms
-  useEffect(() => {
-    const load = () => {
-        try {
-            const data = JSON.parse(localStorage.getItem('saas_gyms') || '[]');
-            // Ensure legacy data has subscriptionPrice
-            const migrated = data.map((g: any) => ({
-                ...g,
-                subscriptionPrice: g.subscriptionPrice || (g.planName === 'Pro' ? 5000 : 3000)
-            }));
-            setGyms(migrated);
-        } catch (e) {
-            console.error("Failed to load gyms", e);
-            setGyms([]);
-        }
-    };
-    load();
-    window.addEventListener('saas_storage_update', load);
-    return () => window.removeEventListener('saas_storage_update', load);
-  }, []);
+  // Load gyms from Supabase
+  const loadGyms = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('gyms').select('*').order('createdAt', { ascending: false });
+    if (error) {
+        console.error("Error loading gyms:", error);
+    } else {
+        setGyms(data || []);
+    }
+    setLoading(false);
+  };
 
-  const notify = () => window.dispatchEvent(new Event('saas_storage_update'));
+  useEffect(() => {
+    loadGyms();
+    
+    // Subscribe to gym changes
+    const channel = supabase.channel('super_admin_gyms')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'gyms' }, () => {
+            loadGyms();
+        })
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
+  }, []);
 
   // --- ACTIONS ---
 
@@ -64,12 +70,19 @@ const SuperAdminDashboard: React.FC<Props> = ({ onNavigateGym, onLogout }) => {
       setGymToDelete(id);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!gymToDelete) return;
-    const updated = gyms.filter(g => g.id !== gymToDelete);
-    localStorage.setItem('saas_gyms', JSON.stringify(updated));
-    setGyms(updated); // Update local state immediately
-    notify();
+    
+    // Delete from Supabase
+    // Note: If you have cascading deletes set up in SQL, this will delete members/payments too.
+    // Otherwise, we might need to delete related data first. Assuming SQL Foreign Keys are set to CASCADE.
+    const { error } = await supabase.from('gyms').delete().eq('id', gymToDelete);
+    
+    if (error) {
+        alert("Error deleting gym: " + error.message);
+    } else {
+        setGyms(prev => prev.filter(g => g.id !== gymToDelete));
+    }
     setGymToDelete(null);
   };
 
@@ -96,7 +109,6 @@ const SuperAdminDashboard: React.FC<Props> = ({ onNavigateGym, onLogout }) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Size check (max 1MB for localStorage safety)
     if (file.size > 1024 * 1024) {
         alert("Image is too large. Please upload an image smaller than 1MB.");
         return;
@@ -123,8 +135,23 @@ const SuperAdminDashboard: React.FC<Props> = ({ onNavigateGym, onLogout }) => {
 
   // --- MASTER REPORT & BACKUP LOGIC (CSV) ---
 
-  const handleExportData = () => {
-      // Professional Headers including Credentials and Payment Details
+  const handleExportData = async () => {
+      // Fetch all needed data from Supabase
+      // We can use a join query if defined, or parallel requests
+      const { data: allPayments, error } = await supabase
+        .from('payments')
+        .select(`
+            *,
+            gyms (
+                name, slug, adminPassword, planName, subscriptionStatus, subscriptionPrice, createdAt
+            )
+        `);
+
+      if(error) {
+          alert("Failed to fetch data for export.");
+          return;
+      }
+
       const headers = [
           'Gym Name',
           'Gym Slug (ID)',
@@ -141,34 +168,22 @@ const SuperAdminDashboard: React.FC<Props> = ({ onNavigateGym, onLogout }) => {
       
       const rows: string[] = [];
 
-      // Iterate through all gyms to build the master ledger
-      gyms.forEach(gym => {
-          const payments: Payment[] = JSON.parse(localStorage.getItem(`gym_${gym.id}_payments`) || '[]');
-          const gymInfo = [
+      allPayments.forEach((p: any) => {
+          if(!p.gyms) return;
+          const gym = p.gyms;
+          rows.push([
               `"${gym.name}"`,
               gym.slug,
               gym.adminPassword || 'admin',
               gym.planName,
               gym.subscriptionStatus,
               gym.subscriptionPrice,
-              gym.createdAt ? gym.createdAt.split('T')[0] : '-'
-          ];
-
-          if (payments.length === 0) {
-              // Add a row for the Gym even if no payments exist, so credentials are preserved in backup
-              rows.push([...gymInfo, '-', '-', '-', '-'].join(','));
-          } else {
-              // Add a row for every payment
-              payments.forEach(p => {
-                  rows.push([
-                      ...gymInfo,
-                      p.date,
-                      `"${p.memberName}"`,
-                      p.amount,
-                      p.method
-                  ].join(','));
-              });
-          }
+              gym.createdAt ? gym.createdAt.split('T')[0] : '-',
+              p.date,
+              `"${p.memberName}"`,
+              p.amount,
+              p.method
+          ].join(','));
       });
 
       const csvContent = [headers.join(','), ...rows].join('\n');
@@ -183,25 +198,27 @@ const SuperAdminDashboard: React.FC<Props> = ({ onNavigateGym, onLogout }) => {
   };
 
   // --- INDIVIDUAL GYM BACKUP (Good Looking CSV) ---
-  const handleGymBackup = (gym: Gym) => {
+  const handleGymBackup = async (gym: Gym) => {
       try {
-          const members: Member[] = JSON.parse(localStorage.getItem(`gym_${gym.id}_members`) || '[]');
-          const payments: Payment[] = JSON.parse(localStorage.getItem(`gym_${gym.id}_payments`) || '[]');
+          const { data: members } = await supabase.from('members').select('*').eq('gymId', gym.id);
+          const { data: payments } = await supabase.from('payments').select('*').eq('gymId', gym.id);
 
-          // Readable Report Headers
+          const mems = members || [];
+          const pays = payments || [];
+
           const headers = [
               'Registration No', 'Full Name', 'Phone', 'Age', 'Membership Plan', 'Plan Fee (PKR)',
               'Join Date', 'Expiry Date', 'Subscription Status', 'Total Amount Paid (PKR)',
               'Last Payment Date', 'Attendance Rate'
           ];
 
-          const rows = members.map(m => {
-              const memberPayments = payments.filter(p => p.memberId === m.id);
+          const rows = mems.map((m: Member) => {
+              const memberPayments = pays.filter((p: Payment) => p.memberId === m.id);
               const totalPaid = memberPayments.reduce((sum, p) => sum + p.amount, 0);
               const lastPayment = memberPayments.sort((a,b) => b.date.localeCompare(a.date))[0];
               
               const trackedDays = Object.keys(m.attendance || {}).length;
-              const presentDays = Object.values(m.attendance || {}).filter(v => v).length;
+              const presentDays = Object.values(m.attendance || {}).filter((v: any) => v).length;
               const rate = trackedDays > 0 ? Math.round((presentDays / trackedDays) * 100) : 0;
 
               const isExpired = new Date(m.expiryDate) < new Date();
@@ -244,20 +261,15 @@ const SuperAdminDashboard: React.FC<Props> = ({ onNavigateGym, onLogout }) => {
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
           try {
               const text = event.target?.result as string;
               if (!text) throw new Error("Empty file");
 
-              // Simple CSV Parse
               const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
               if (lines.length < 2) throw new Error("Invalid CSV format");
 
-              // Basic headers check to ensure it's the right format
               const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-              // Expected index mappings based on Backup CSV
-              // 0: Reg No, 1: Name, 2: Phone, 3: Age, 4: Plan, 5: Fee, 6: Join, 7: Expiry, 9: Total Paid, 10: Last Payment Date
-              
               const requiredCols = ['Registration No', 'Full Name'];
               const isValid = requiredCols.every(c => headers.includes(c));
               
@@ -266,31 +278,27 @@ const SuperAdminDashboard: React.FC<Props> = ({ onNavigateGym, onLogout }) => {
                   return;
               }
 
-              // Load existing data
-              const memberKey = `gym_${gym.id}_members`;
-              const payKey = `gym_${gym.id}_payments`;
-              const existingMembers: Member[] = JSON.parse(localStorage.getItem(memberKey) || '[]');
-              const existingPayments: Payment[] = JSON.parse(localStorage.getItem(payKey) || '[]');
+              // Fetch existing members to avoid ID collision or to update
+              const { data: existingMembers } = await supabase.from('members').select('id, registrationNo').eq('gymId', gym.id);
+              const { data: existingPayments } = await supabase.from('payments').select('memberId, amount').eq('gymId', gym.id);
 
               let importedMembersCount = 0;
               let importedPaymentsCount = 0;
 
               // Parse Rows
               for (let i = 1; i < lines.length; i++) {
-                  // Handle quoted CSV parsing
+                  // CSV Parsing Logic
                   const rowStr = lines[i];
                   const cells: string[] = [];
                   let inQuote = false;
                   let buffer = '';
-                  
                   for(let char of rowStr) {
                       if(char === '"') { inQuote = !inQuote; continue; }
                       if(char === ',' && !inQuote) { cells.push(buffer); buffer = ''; continue; }
                       buffer += char;
                   }
-                  cells.push(buffer); // Last cell
+                  cells.push(buffer);
 
-                  // Extract Data (Fallbacks for safety)
                   const regNo = cells[0]?.trim() || '';
                   const name = cells[1]?.trim() || '';
                   const phone = cells[2]?.trim() || '';
@@ -300,118 +308,95 @@ const SuperAdminDashboard: React.FC<Props> = ({ onNavigateGym, onLogout }) => {
                   const joinDate = cells[6]?.trim() || new Date().toISOString().split('T')[0];
                   const expiryDate = cells[7]?.trim() || new Date().toISOString().split('T')[0];
                   const totalPaidHistory = parseInt(cells[9]) || 0;
-                  const lastPaymentDateStr = cells[10]?.trim();
 
                   if (!regNo || !name) continue;
 
-                  // 1. Upsert Member
-                  let memberId = '';
-                  const existingIdx = existingMembers.findIndex(m => m.registrationNo === regNo);
-                  
-                  if (existingIdx >= 0) {
-                      // Update existing
-                      memberId = existingMembers[existingIdx].id;
-                      existingMembers[existingIdx] = {
-                          ...existingMembers[existingIdx],
+                  // 1. Check if member exists
+                  const match = existingMembers?.find(m => m.registrationNo === regNo);
+                  let memberId = match?.id;
+
+                  if (memberId) {
+                      // Update
+                       await supabase.from('members').update({
                           name, phone, age, plan, fee, joinDate, expiryDate
-                      };
+                      }).eq('id', memberId);
                   } else {
-                      // Create New
-                      memberId = `m_${Date.now()}_${Math.floor(Math.random()*1000)}`;
-                      existingMembers.push({
+                      // Create
+                      memberId = crypto.randomUUID();
+                      await supabase.from('members').insert({
                           id: memberId,
                           gymId: gym.id,
                           registrationNo: regNo,
                           name, phone, age, plan, fee, joinDate, expiryDate,
-                          feePaid: true, // Assuming imported members have history
-                          remindersEnabled: true,
+                          feePaid: true,
                           attendance: {}
                       });
                       importedMembersCount++;
                   }
 
-                  // 2. Reconcile Payments (Historical Import with Smart Distribution)
-                  const currentTotalInSystem = existingPayments
-                      .filter(p => p.memberId === memberId)
-                      .reduce((sum, p) => sum + p.amount, 0);
+                  // 2. Reconcile Payments
+                  const currentTotal = existingPayments
+                    ?.filter((p: any) => p.memberId === memberId)
+                    .reduce((sum: number, p: any) => sum + p.amount, 0) || 0;
 
-                  if (totalPaidHistory > currentTotalInSystem) {
-                      let remainingToImport = totalPaidHistory - currentTotalInSystem;
-                      
-                      // Try to distribute based on plan fee to populate monthly revenue history
+                  if (totalPaidHistory > currentTotal) {
+                      let remainingToImport = totalPaidHistory - currentTotal;
                       let currentDate = new Date(joinDate);
                       
-                      // Only distribute iteratively if fee is valid and positive
+                      const newPayments = [];
                       if (fee > 0) {
                           while (remainingToImport >= fee) {
-                              existingPayments.push({
-                                  id: `p_imp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                              newPayments.push({
+                                  id: crypto.randomUUID(),
                                   gymId: gym.id,
                                   memberId: memberId,
                                   memberName: name,
                                   date: currentDate.toISOString().split('T')[0],
                                   amount: fee,
-                                  method: 'Cash',
-                                  invoiceMockUrl: ''
+                                  method: 'Cash'
                               });
-                              
                               remainingToImport -= fee;
                               importedPaymentsCount++;
-
-                              // Increment date
                               if (plan === 'Quarterly') currentDate.setMonth(currentDate.getMonth() + 3);
                               else if (plan === 'Yearly') currentDate.setFullYear(currentDate.getFullYear() + 1);
-                              else currentDate.setMonth(currentDate.getMonth() + 1); // Default Monthly
+                              else currentDate.setMonth(currentDate.getMonth() + 1);
                           }
                       }
-
-                      // Add any remainder
                       if (remainingToImport > 0) {
-                           let finalDate = joinDate;
-                           // If last payment date exists and is valid, use it for the remainder
-                           if (lastPaymentDateStr && lastPaymentDateStr !== 'Never' && !isNaN(Date.parse(lastPaymentDateStr))) {
-                               finalDate = lastPaymentDateStr;
-                           } else if (fee > 0) {
-                               // If we iterated, use the last calculated date from loop
-                               finalDate = currentDate.toISOString().split('T')[0];
-                           }
-
-                           existingPayments.push({
-                              id: `p_imp_rem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                          newPayments.push({
+                              id: crypto.randomUUID(),
                               gymId: gym.id,
                               memberId: memberId,
                               memberName: name,
-                              date: finalDate,
+                              date: joinDate,
                               amount: remainingToImport,
-                              method: 'Cash',
-                              invoiceMockUrl: ''
+                              method: 'Cash'
                           });
                           importedPaymentsCount++;
+                      }
+                      
+                      if(newPayments.length > 0) {
+                          await supabase.from('payments').insert(newPayments);
                       }
                   }
               }
 
-              // Save back
-              localStorage.setItem(memberKey, JSON.stringify(existingMembers));
-              localStorage.setItem(payKey, JSON.stringify(existingPayments));
-              notify();
-              
-              alert(`Import Successful!\n\n- ${importedMembersCount} members processed.\n- ${importedPaymentsCount} historical payments distributed across revenue months.`);
+              alert(`Import Successful!\nAdded/Updated ${importedMembersCount} members and reconciled ${importedPaymentsCount} payments.`);
               
           } catch (err) {
               console.error(err);
-              alert("Failed to import CSV. Ensure it is a valid 'Gym Backup' file.");
+              alert("Failed to import CSV.");
           }
       };
       reader.readAsText(file);
-      e.target.value = ''; // Reset input
+      e.target.value = ''; 
   };
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
       e.preventDefault();
       if(!formData.name || !formData.slug) return;
 
-      const newId = Date.now().toString();
+      const newId = crypto.randomUUID();
       const trialDays = 14;
       const trialEnd = new Date(Date.now() + trialDays * 86400000).toISOString().split('T')[0];
 
@@ -429,31 +414,30 @@ const SuperAdminDashboard: React.FC<Props> = ({ onNavigateGym, onLogout }) => {
           logoBase64: formData.logoBase64
       };
 
-      try {
-          const updatedList = [...gyms, newGym];
-          localStorage.setItem('saas_gyms', JSON.stringify(updatedList));
-          setGyms(updatedList);
-          notify();
+      const { error } = await supabase.from('gyms').insert([newGym]);
+
+      if (error) {
+          alert("Error creating gym: " + error.message);
+      } else {
+          setGyms(prev => [...prev, newGym]);
           setIsAddModalOpen(false);
           setFormData({ name: '', slug: '', password: '', plan: 'Pro', price: 5000, logoBase64: '' });
           setSlugTouched(false);
-      } catch (err) {
-          alert("Storage Limit Exceeded. Could not add gym.");
       }
   };
 
-  const handleEditSave = (e: React.FormEvent) => {
+  const handleEditSave = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!editingGym) return;
-      try {
-          const updatedGyms = gyms.map(g => g.id === editingGym.id ? editingGym : g);
-          localStorage.setItem('saas_gyms', JSON.stringify(updatedGyms));
-          setGyms(updatedGyms);
-          notify();
+      
+      const { error } = await supabase.from('gyms').update(editingGym).eq('id', editingGym.id);
+
+      if (error) {
+          alert("Error updating gym: " + error.message);
+      } else {
+          setGyms(prev => prev.map(g => g.id === editingGym.id ? editingGym : g));
           setIsEditModalOpen(false);
           setEditingGym(null);
-      } catch (err) {
-          alert("Storage Limit Exceeded. Could not save changes.");
       }
   };
 
@@ -491,7 +475,7 @@ const SuperAdminDashboard: React.FC<Props> = ({ onNavigateGym, onLogout }) => {
         <header className="flex justify-between items-center mb-8 pb-4 border-b border-gray-700">
             <div>
                 <h1 className="text-3xl font-bold text-white">Super Admin Dashboard</h1>
-                <p className="text-text-secondary">Gym Management System</p>
+                <p className="text-text-secondary">Gym Management System {loading && "(Syncing...)"}</p>
             </div>
             <div className="flex gap-3">
                 <button onClick={() => setIsDataToolsOpen(true)} className="flex items-center gap-2 bg-indigo-900/40 text-indigo-300 hover:text-white border border-indigo-700 rounded px-4 py-2 transition-colors">
@@ -609,7 +593,9 @@ const SuperAdminDashboard: React.FC<Props> = ({ onNavigateGym, onLogout }) => {
                             })}
                             {gyms.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="p-6 text-center text-gray-500">No gyms found. Click "Add Gym" to start.</td>
+                                    <td colSpan={6} className="p-6 text-center text-gray-500">
+                                        {loading ? "Loading gyms..." : "No gyms found. Click 'Add Gym' to start."}
+                                    </td>
                                 </tr>
                             )}
                         </tbody>

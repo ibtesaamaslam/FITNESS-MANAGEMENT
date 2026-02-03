@@ -15,22 +15,18 @@ import Report from './components/Report';
 import Visitors from './components/Visitors';
 import SubscriptionGuard from './components/SubscriptionGuard';
 import { DashboardIcon, MembersIcon, FeesIcon, AttendanceIcon, ReportIcon, CreditCardIcon, LogOutIcon, MenuIcon, ServerIcon, UsersIcon } from './components/icons';
+import { supabase } from './lib/supabase';
 
 const App: React.FC = () => {
     // Basic Hash Router
     const [hash, setHash] = useState(window.location.hash);
+    const [currentGym, setCurrentGym] = useState<Gym | null>(null);
+    const [gymLoading, setGymLoading] = useState(false);
     
     useEffect(() => {
         const handleHash = () => setHash(window.location.hash);
         window.addEventListener('hashchange', handleHash);
         
-        // Initialize storage if empty (No Mock Data)
-        if (!localStorage.getItem('saas_gyms')) {
-            localStorage.setItem('saas_gyms', JSON.stringify([]));
-        }
-
-        // Default to Landing Page logic
-        // If there is no hash, OR if the hash is just '#/', redirect to #/landing
         if(!window.location.hash || window.location.hash === '#/') {
             window.location.hash = '#/landing';
         }
@@ -39,16 +35,30 @@ const App: React.FC = () => {
     }, []);
 
     // --- ROUTING LOGIC ---
-    // /landing
-    // /owner/login
-    // /owner/forgot-password
-    // /owner/reset-password
-    // /owner/dashboard
-    // /g/:slug/login
-    // /g/:slug/dashboard ...
-    
     const parts = hash.replace('#', '').split('/').filter(Boolean); // ['g', 'slug', 'dashboard']
     const root = parts[0]; 
+
+    // Fetch Gym Info when slug changes
+    useEffect(() => {
+        const fetchGym = async () => {
+            if (root === 'g' && parts[1]) {
+                // If we already have the correct gym loaded, don't refetch
+                if (currentGym && currentGym.slug === parts[1]) return;
+
+                setGymLoading(true);
+                const { data, error } = await supabase
+                    .from('gyms')
+                    .select('*')
+                    .eq('slug', parts[1])
+                    .single();
+                
+                if (data) setCurrentGym(data);
+                else setCurrentGym(null);
+                setGymLoading(false);
+            }
+        };
+        fetchGym();
+    }, [hash, root]);
 
     // --- LANDING PAGE ---
     if (root === 'landing' || !root) {
@@ -61,7 +71,6 @@ const App: React.FC = () => {
         
         if (action === 'login') {
             return <Login type="owner" mode="login" onLogin={(pass) => {
-                // Check against storage or default
                 const currentPass = localStorage.getItem('saas_owner_pwd') || '*469702*';
                 if (pass === currentPass) {
                     window.location.hash = '#/owner/dashboard';
@@ -96,19 +105,14 @@ const App: React.FC = () => {
     if (root === 'g') {
         const slug = parts[1];
         const action = parts[2] || 'login';
-        const subId = parts[3]; // Used for specific member ID etc.
+        const subId = parts[3]; 
 
-        // 1. Resolve Gym
-        const allGyms = JSON.parse(localStorage.getItem('saas_gyms') || '[]');
-        const currentGym = allGyms.find((g: Gym) => g.slug === slug);
-
-        // 404
+        if (gymLoading) return <div className="text-white p-8">Loading Gym Data...</div>;
         if (!currentGym) return <div className="text-white p-8">Gym not found. <a href="#/landing" className="underline">Back to Home</a></div>;
 
         // Gym Login
         if (action === 'login') {
             return <Login type="gym" mode="login" gymName={currentGym.name} onLogin={(pass) => {
-                // Check password from storage, default to 'admin' if not set
                 const correctPass = currentGym.adminPassword || 'admin';
                 if (pass === correctPass) {
                     window.location.hash = `#/g/${slug}/dashboard`;
@@ -120,12 +124,9 @@ const App: React.FC = () => {
             }} />;
         }
 
-        // Member Login (simplified URL for demo: /g/slug/member)
+        // Member Login
         if (action === 'member') {
              return <Login type="member" mode="login" gymName={currentGym.name} onLogin={(id) => {
-                 // Member view logic... (Keeping it simple, just redirect to attendance with filter)
-                 // For now, let's just use the Admin view but simulated read-only could be a future step.
-                 // The prompt asks for "Login by registration number and only allowed to view personal attendance".
                  alert("Member view is a subset of features. Redirecting to attendance for demo purposes.");
                  window.location.hash = `#/g/${slug}/attendance`;
                  return true;
@@ -148,7 +149,6 @@ const GymApp: React.FC<{ gym: Gym, view: string, subId?: string }> = ({ gym, vie
 
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     
-    // Derived name (allow local override from hook if changed)
     const displayName = gymName || gym.name;
 
     const navigate = (v: string) => {
@@ -157,7 +157,6 @@ const GymApp: React.FC<{ gym: Gym, view: string, subId?: string }> = ({ gym, vie
     };
 
     const renderContent = () => {
-        // Special Case: Member Profile View
         if (view === 'members' && subId) {
             return (
                 <MemberProfile 
@@ -232,7 +231,6 @@ const GymApp: React.FC<{ gym: Gym, view: string, subId?: string }> = ({ gym, vie
                 </div>
                 
                 <main className="flex-1 overflow-auto bg-background relative">
-                    {/* Subscription Guard Wraps Content */}
                     <SubscriptionGuard 
                         gym={gym} 
                         onNavigateToBilling={() => navigate('billing')}

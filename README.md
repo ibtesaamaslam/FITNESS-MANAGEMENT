@@ -1,185 +1,236 @@
 
-# 🏋️‍♂️ GYM KHATA - Ultimate Gym Management SaaS
+# 🏋️‍♂️ GYM KHATA - Enterprise Gym Management SaaS
 
 ![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
 ![Status](https://img.shields.io/badge/status-Production%20Ready-success.svg)
-![Tech](https://img.shields.io/badge/react-19-61DAFB.svg)
-![License](https://img.shields.io/badge/license-MIT-purple.svg)
+![Tech](https://img.shields.io/badge/React%2019-TypeScript-blue)
+![Backend](https://img.shields.io/badge/Supabase-PostgreSQL-green)
+![Styling](https://img.shields.io/badge/Tailwind-CSS-38bdf8)
 
-**GYM KHATA** is a cutting-edge, multi-tenant SaaS (Software as a Service) platform designed to revolutionize fitness center operations. Built with a "Local-First" architecture, it offers a dual-interface ecosystem: a robust **Super Admin Console** for SaaS owners to manage tenants and subscriptions, and a feature-rich **Gym Portal** for facility managers to handle members, financials, and analytics.
+**GYM KHATA** is a cutting-edge, multi-tenant SaaS (Software as a Service) platform designed to revolutionize fitness center operations. Built with modern web technologies, it offers real-time data synchronization, robust financial tracking, and a seamless user experience for both Gym Owners and the Super Admin.
 
 ---
 
 ## 📑 Table of Contents
-
-- [🌟 System Overview](#-system-overview)
-- [👑 Super Admin Console](#-super-admin-console)
-- [🏢 Gym Management Portal](#-gym-management-portal)
-  - [Dashboard & Insights](#dashboard--insights)
-  - [Member Management](#member-management)
-  - [Financial Ledger & Smart Billing](#financial-ledger--smart-billing)
-  - [Attendance Tracking](#attendance-tracking)
-  - [Visitor CRM](#visitor-crm)
-  - [Pro Analytics](#pro-analytics)
-- [💾 Data Management & Backup](#-data-management--backup)
-- [🛡️ Security & Access Control](#-security--access-control)
-- [💻 Technical Architecture](#-technical-architecture)
-- [🚀 Quick Start Guide](#-quick-start-guide)
+- [🚀 Technical Architecture](#-technical-architecture)
+- [📂 Project Structure](#-project-structure)
+- [✨ Key Features](#-key-features)
+  - [👑 Super Admin (Owner Console)](#-super-admin-owner-console)
+  - [🏢 Gym Admin Portal](#-gym-admin-portal)
+- [🗄️ Database Schema](#-database-schema)
+- [🛠️ Installation & Setup](#-installation--setup)
+- [🖥️ Usage Guide](#-usage-guide)
+- [🔐 Security & Access](#-security--access)
 
 ---
 
-## 🌟 System Overview
+## 🚀 Technical Architecture
 
-Gym Khata operates on a strict multi-tenant model ensuring data isolation and privacy.
+### **Frontend**
+- **Framework**: [React 18+](https://react.dev/) with [Vite](https://vitejs.dev/) for lightning-fast builds.
+- **Language**: **TypeScript** for type safety and maintainable code.
+- **Styling**: **Tailwind CSS** with a custom dark-mode theme (`bg-background`, `text-primary`).
+- **Charts**: **Recharts** for responsive financial and attendance analytics.
+- **Icons**: Custom SVG component library.
 
--   **Role-Based Access Control (RBAC)**: Distinct workflows for Super Admins (Owners), Gym Admins (Tenants), and Members.
--   **Subscription-Driven Access**: Features are gated by subscription status (Trial, Active, Past Due, Suspended).
--   **Local-First Persistence**: Utilizes browser `localStorage` to simulate a database, ensuring offline capabilities and zero-latency interactions.
-
----
-
-## 👑 Super Admin Console
-
-The central command center for the SaaS owner to manage the business.
-
--   **Access Route**: `#/owner/login`
--   **Default Credentials**: Password `*469702*` (Changeable via settings)
-
-### Key Capabilities
-
-1.  **Tenant Lifecycle Management**:
-    *   **Onboarding**: Create new gym instances with custom branding (Logo) and URL slugs.
-    *   **Monitoring**: Real-time view of all gyms, their plan status (Basic/Pro), and expiry dates.
-    *   **Alerts**: Automatic visual indicators for gyms expiring within 7 days or those that are past due.
-
-2.  **Subscription Control**:
-    *   **Plan Management**: Assign plans (Basic vs. Pro) and set custom pricing.
-    *   **Status Override**: Manually suspend, cancel, or extend trials for any tenant.
-    *   **Revenue Tracking**: Dashboard KPI showing total Monthly Recurring Revenue (MRR) from active tenants.
-
-3.  **Advanced Data Tools**:
-    *   **Master System Backup**: Generate a comprehensive CSV report containing **all** data from **all** gyms, including admin credentials and consolidated financial records.
-    *   **Gym Data Import/Restore**: Upload CSV backups for specific gyms directly from the dashboard. The system intelligently merges members and creates historical payment records to reconcile revenue figures.
-    *   **Impersonation**: One-click "Login as Admin" to view any gym's dashboard without needing their specific password (useful for support).
+### **Backend (BaaS)**
+- **Database**: **PostgreSQL** hosted on **Supabase**.
+- **Realtime**: Supabase Realtime subscriptions for live updates across dashboards.
+- **Storage**: Supabase Storage for gym logos and member photos (Base64 fallback supported).
+- **Security**: Row Level Security (RLS) configured (currently open for demo purposes).
 
 ---
 
-## 🏢 Gym Management Portal
+## 📂 Project Structure
 
-A comprehensive operating system for gym owners.
+A comprehensive overview of the file organization:
 
--   **Access Route**: `#/g/[gym-slug]/login`
--   **Default Password**: `admin` (Customizable)
-
-### Dashboard & Insights
-*Component: `Dashboard.tsx`*
--   **Live KPIs**: Instant view of Total Members, Active Memberships, and Current Month's Revenue.
--   **Visual Analytics**:
-    -   **Weekly Attendance**: Bar chart visualizing footfall trends over the last 7 days.
-    -   **Recent Payments**: Real-time feed of the latest fee collections.
-
-### Member Management
-*Component: `Members.tsx`*
--   **Smart Profiles**: Detailed view of every member including photo, contact info, and current plan.
--   **Status Intelligence**:
-    -   <span style="color:green">● Active</span>: Membership is valid.
-    -   <span style="color:orange">● Due Soon</span>: Expires in ≤ 5 days.
-    -   <span style="color:red">● Expired</span>: Membership has lapsed.
--   **Sorting & Filtering**: Natural sorting by Registration Number, Name, or Join Date.
--   **Actions**: Edit details, delete records, or view deep-dive profiles.
-
-### Financial Ledger & Smart Billing
-*Component: `Fees.tsx`*
--   **Revenue Engine**: Dedicated revenue widget with month-over-month navigation.
--   **Smart Renewals**:
-    -   **One-Click Renewal**: Recording a payment automatically extends the member's expiry date based on their plan (Monthly/Quarterly/Yearly).
-    -   **Double-Charge Protection**: Alerts the admin if they attempt to renew an already active member.
-    -   **Auto-Calculation**: Extends expiry date based on plan duration.
--   **Ledger**: Detailed history of all transactions (Cash, Bank Transfer, Digital Wallets).
--   **Export**: Download fee history as CSV for external accounting.
-
-### Attendance Tracking
-*Component: `Attendance.tsx`*
--   **Daily Log**: Rapidly mark members as Present/Absent.
--   **Live Stats**: View daily turnout percentage and absolute counts.
--   **Contextual Cues**: See member expiry status directly in the attendance list to catch unpaid members at the door.
-
-### Visitor CRM
-*Component: `Visitors.tsx`*
--   **Lead Tracking**: Log walk-ins and inquiries.
--   **Categorization**: Tag visitors as Inquiry, Day Pass, or Guest.
--   **Notes**: Keep detailed remarks for follow-ups.
-
-### Pro Analytics
-*Component: `Report.tsx`*
-*(Available only on Pro Plan)*
--   **Revenue Trends**: 6-month historical revenue bar chart.
--   **Growth Metrics**: Line chart tracking new member acquisition.
--   **Business Health**: Lifetime Value (LTV) calculation and Best Performing Month analysis.
+```text
+/
+├── .env                       # Environment variables (Supabase URL & Anon Key)
+├── index.html                 # Entry HTML file with Tailwind config
+├── index.tsx                  # React Entry point
+├── App.tsx                    # Main Routing Logic & Layout Shell
+├── types.ts                   # TypeScript Interfaces (Member, Gym, Payment models)
+├── supabase_schema.sql        # Database initialization script
+├── package.json               # Dependencies and scripts
+├── vite.config.ts             # Vite build configuration
+│
+├── components/                # UI Components
+│   ├── Landing.tsx            # Public Landing Page (Gym Login)
+│   ├── Login.tsx              # Universal Login Component (Owner/Gym/Member)
+│   ├── SuperAdminDashboard.tsx# SaaS Owner Control Panel (Manage Gyms)
+│   ├── Dashboard.tsx          # Gym-specific Dashboard (Stats & Charts)
+│   ├── Members.tsx            # Member List & CRUD Modal
+│   ├── MemberProfile.tsx      # Detailed Member View (Pro feature)
+│   ├── Fees.tsx               # Payment Ledger, Renewals & CSV Export
+│   ├── Attendance.tsx         # Daily Attendance Tracker
+│   ├── Visitors.tsx           # Visitor/Inquiry Log
+│   ├── Report.tsx             # Advanced Analytics (Charts)
+│   ├── BillingPortal.tsx      # Gym Subscription & Settings
+│   ├── SubscriptionGuard.tsx  # HOC for blocking features based on plan status
+│   ├── Toast.tsx              # Notification system
+│   └── icons.tsx              # SVG Icon System
+│
+├── hooks/
+│   └── useGymData.ts          # Custom Hook: Manages Realtime Supabase Sync
+│
+├── lib/
+│   ├── supabase.ts            # Supabase Client Initialization
+│   └── dbConfig.ts            # Server-side DB connection strings (Reference)
+│
+└── data/
+    └── mockData.ts            # Fallback/Test data structures
+```
 
 ---
 
-## 💾 Data Management & Backup
+## ✨ Key Features
 
-Gym Khata includes a sophisticated Data Import/Export system to ensure data portability and safety.
+### 👑 Super Admin (Owner Console)
+*Access Route: `#/owner/login`*
 
-### 1. Gym-Level Backup
--   **Export**: Gym Admins can download a "Master Report" CSV from their settings. This includes granular details on members, attendance rates, and financial totals.
--   **Restore (Smart Import)**:
-    -   Super Admins can upload a previous backup CSV via the Super Admin Dashboard.
-    -   **Intelligent Merge**: The system matches members by Registration Number. If they exist, details are updated; if not, new profiles are created.
-    -   **Financial Reconciliation**: The importer reads the "Total Amount Paid" from the CSV. If the imported total is higher than the current system record, it automatically creates **historical payment records** distributed across previous months based on the plan fee. This ensures your **revenue charts** look correct even after a fresh restore!
+The command center for the SaaS owner to manage all gym tenants.
 
-### 2. System-Level Backup
--   Super Admins can download a global CSV containing credentials and financial summaries for *every* gym in the system for auditing purposes.
+1.  **Global Dashboard**:
+    *   View Total Monthly Recurring Revenue (MRR).
+    *   Track total active gyms and those with past-due payments.
+    *   Real-time list of all registered gyms with status indicators.
+
+2.  **Tenant Management**:
+    *   **Create Gyms**: Provision new instances with custom Slugs (URLs), logos, and initial passwords.
+    *   **Edit Subscription**: Upgrade/Downgrade plans (Basic vs Pro), adjust pricing, and manage billing dates.
+    *   **Manage Status**: Manually suspend, cancel, or extend trials for gyms.
+    *   **Impersonation**: "God Mode" login to access any gym's dashboard instantly without knowing their password.
+
+3.  **System Tools**:
+    *   **Master Backup**: Generate a consolidated CSV report of *all* gyms, including admin passwords and financial summaries.
+    *   **Security**: Update the global Super Admin password.
+
+### 🏢 Gym Admin Portal
+*Access Route: `#/g/[gym-slug]/login`*
+
+A comprehensive operating system for individual gym owners.
+
+#### 1. **Dashboard**
+*   **Live Stats**: Total members, active memberships count, monthly revenue.
+*   **Visuals**: Weekly attendance bar chart, recent payment activity feed.
+*   **Plan Status**: Visibility into the gym's own subscription status (Trial/Active/Due).
+
+#### 2. **Member Management**
+*   **CRUD Operations**: Add, Edit, and Delete members.
+*   **Profile Management**: Upload photos, store contact info, age, and registration numbers.
+*   **Membership Tracking**:
+    *   **Plans**: Monthly, Quarterly, Yearly.
+    *   **Auto-Expiry**: Expiry dates calculated automatically based on join date and plan.
+    *   **Status Indicators**: Visual badges for **Active**, **Due Soon** (≤5 days), and **Expired**.
+*   **Search & Sort**: Filter by name/reg-no; sort by expiry to find at-risk members.
+
+#### 3. **Fees Ledger & Billing**
+*   **Payment Recording**: Log payments via Cash, Easypaisa, JazzCash, or Bank Transfer.
+*   **Smart Renewals**:
+    *   Renewing a member automatically extends their expiry date based on their current plan.
+    *   **Safety Guard**: Prevents accidental double-renewals if a member is still active (with override option).
+*   **Financial Reports**:
+    *   Monthly Revenue Navigation (Prev/Next Month).
+    *   **Export to CSV**: Download detailed fee ledgers for accounting.
+
+#### 4. **Attendance System**
+*   **Daily Log**: Mark members Present/Absent for the current date.
+*   **Stats**: Real-time calculation of Daily Turnout Rate (%).
+*   **History**: View attendance history in member profiles (Last 14 records visualizer).
+
+#### 5. **Visitors Log**
+*   Track walk-in inquiries, day-pass users, and guests.
+*   Store contact details and follow-up notes.
+
+#### 6. **Analytics Report (Pro Plan Feature)**
+*   **Revenue History**: 6-month bar chart visualization of income.
+*   **Growth Trends**: Line chart showing new member acquisition over time.
+*   **Key Metrics**: Lifetime Revenue, Best Performing Month, Average Member Age.
+
+#### 7. **Settings & Billing**
+*   **Branding**: Update Gym Name and Logo.
+*   **Security**: Change the Gym Admin Password.
+*   **Data Export**: Download a full backup of members and payments (CSV).
+*   **Subscription**: View current SaaS plan details and payment instructions for the SaaS owner.
 
 ---
 
-## 🛡️ Security & Access Control
+## 🗄️ Database Schema
 
--   **Subscription Guard**: A higher-order component that wraps the application logic.
-    -   **Trial Mode**: Shows countdown banner.
-    -   **Past Due**: Restricts write access and shows warning banners.
-    -   **Suspended**: Completely blocks UI access with a lock screen.
--   **Credential Management**: Admins can rotate their passwords instantly. Super Admin can reset any gym's password.
--   **Sandboxed Environment**: Data is stored in browser `localStorage` keyed by Gym ID, preventing cross-tenant data leakage.
+The application uses a relational PostgreSQL schema.
 
----
+| Table | Description | Key Relationships |
+| :--- | :--- | :--- |
+| **`gyms`** | Stores tenant information (Name, Slug, Auth, Plan Status). | Primary Key `id` |
+| **`members`** | Stores gym members. Contains JSONB for attendance. | `gymId` -> `gyms.id` |
+| **`payments`** | Financial records for memberships. | `gymId` -> `gyms.id`, `memberId` -> `members.id` |
+| **`visitors`** | Log for non-member walk-ins. | `gymId` -> `gyms.id` |
 
-## 💻 Technical Architecture
-
--   **Frontend**: React 19 (Functional Components, Hooks).
--   **Language**: TypeScript (Strict typing for robust data handling).
--   **Styling**: Tailwind CSS (Dark Mode optimized, Responsive).
--   **Charts**: Recharts library for data visualization.
--   **State Management**: React Context + Event Bus pattern for cross-component synchronization without prop-drilling.
--   **Storage**: `localStorage` based persistence (simulates backend database).
+*Note: All tables have Realtime enabled via Supabase Publication.*
 
 ---
 
-## 🚀 Quick Start Guide
+## 🛠️ Installation & Setup
 
-1.  **Clone & Install**:
-    ```bash
-    git clone https://github.com/your-repo/gym-khata.git
-    cd gym-khata
-    npm install
-    ```
+### Prerequisites
+- Node.js (v18+)
+- A Supabase Project
 
-2.  **Run Locally**:
-    ```bash
-    npm start
-    ```
+### 1. Environment Configuration
+Create a `.env` file in the root directory (or use the provided one):
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-3.  **First Login**:
-    -   Navigate to `http://localhost:3000/#/owner/login`
-    -   Login with: `*469702*`
-    -   Create your first Gym!
+### 2. Database Setup
+1. Copy the contents of `supabase_schema.sql` from the project root.
+2. Go to the **SQL Editor** in your Supabase Dashboard.
+3. Paste and run the script. This creates:
+   - `uuid-ossp` extension.
+   - Tables: `gyms`, `members`, `payments`, `visitors`.
+   - Security Policies (RLS).
+   - Storage Buckets.
 
-4.  **Gym Login**:
-    -   Use the credentials you just created (default password is `admin`).
-    -   Start adding members!
+### 3. Run Locally
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
 
 ---
 
-*© 2026 GYM KHATA SaaS. Engineered for Performance & Reliability.*
+## 🖥️ Usage Guide
+
+### 1. Initial Setup (Owner)
+1.  Navigate to `http://localhost:5173/#/owner/login`.
+2.  Login with default password: `*469702*`.
+3.  Click **+ Add Gym** to create your first tenant (e.g., "Iron Fitness", slug: "iron-fitness").
+
+### 2. Gym Admin Login
+1.  Navigate to `http://localhost:5173/#/landing`.
+2.  Enter the Gym ID (Slug) created above (e.g., `iron-fitness`).
+3.  Enter the password (default: `admin`).
+
+### 3. Workflow
+*   **Add Members**: Go to the **Members** tab and register new users.
+*   **Receive Fees**: Go to **Fees**, click "Record Payment", select a member.
+*   **Mark Attendance**: Go to **Attendance**, toggle checkboxes for present members.
+*   **View Reports**: Check **Dashboard** or **Reports** (if on Pro plan) for insights.
+
+---
+
+## 🔐 Security & Access
+
+*   **Role-Based Views**: The app strictly separates the "Owner" view from the "Gym" view.
+*   **Subscription Guard**: If a gym's subscription status is `suspended` or `cancelled`, access to features is blocked automatically. `past_due` allows access but shows warnings.
+*   **Data Isolation**: While RLS is currently set to public for demonstration ease, the frontend logic strictly filters data by `gymId` to ensure tenants only see their own data.
+
+---
+
+*© 2026 GYM KHATA SaaS. All Rights Reserved.*
