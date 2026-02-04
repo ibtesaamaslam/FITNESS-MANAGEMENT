@@ -62,8 +62,8 @@ const App: React.FC = () => {
     }, []);
 
     // Handlers (Wrapped to trigger toasts)
-    const handleAddMember = useCallback((memberData: Omit<Member, 'id'>, paymentMethod: Payment['method']) => {
-        addMember(memberData, paymentMethod);
+    const handleAddMember = useCallback((memberData: Omit<Member, 'id'>, paymentMethod: Payment['method'], paidAmount?: number) => {
+        addMember(memberData, paymentMethod, paidAmount);
         showToast(`Member ${memberData.name} added successfully!`);
     }, [addMember, showToast]);
 
