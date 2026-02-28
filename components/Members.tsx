@@ -496,7 +496,7 @@ const Members: React.FC<MembersProps> = ({ members, payments, onAddMember, onUpd
                                     <td className="p-4">
                                         <div className="flex items-center">
                                             <span>{member.expiryDate}</span>
-                                            {isExpiringSoon(member.expiryDate) && (
+                                            {isExpiringSoon(member.expiryDate, 1) && (
                                                 <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-400" title="Membership is expiring soon!">
                                                     Expiring
                                                 </span>

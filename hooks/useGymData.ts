@@ -38,7 +38,7 @@ export const useGymData = () => {
         }
     }, [payments]);
 
-    const addMember = useCallback((memberData: Omit<Member, 'id'>, paymentMethod: Payment['method'], initialPaymentAmount?: number) => {
+    const addMember = useCallback((memberData: Omit<Member, 'id'>, paymentMethod: Payment['method']) => {
         const newMember: Member = {
             id: `m${Date.now()}`,
             ...memberData,
@@ -46,20 +46,7 @@ export const useGymData = () => {
         };
         
         let newPayment: Payment | null = null;
-        
-        // If an explicit payment amount is passed (e.g. partial or including reg fee)
-        if (initialPaymentAmount && initialPaymentAmount > 0) {
-             newPayment = {
-                id: `p${Date.now()}`,
-                memberId: newMember.id,
-                memberName: newMember.name,
-                date: new Date().toISOString().split('T')[0],
-                amount: initialPaymentAmount,
-                method: paymentMethod,
-            };
-        } 
-        // Fallback for legacy calls or pure boolean checks (though UI now handles amounts)
-        else if (newMember.feePaid) {
+        if (newMember.feePaid) {
             newPayment = {
                 id: `p${Date.now()}`,
                 memberId: newMember.id,

@@ -158,7 +158,7 @@ const Attendance: React.FC<AttendanceProps> = ({ members, role, onUpdateAttendan
                     <div>
                         <div className="flex items-center space-x-2">
                             <span>{member.name}</span>
-                            {isExpiringSoon(member.expiryDate) && (
+                            {isExpiringSoon(member.expiryDate, 1) && (
                                 <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-400" title="Membership is expiring soon!">
                                     Expiring
                                 </span>

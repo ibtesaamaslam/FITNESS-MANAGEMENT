@@ -7,7 +7,7 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     const monthlyAttendanceSummary = useMemo(() => {
-        return Object.entries(member.attendance).reduce((acc, [date, present]) => {
+        return Object.entries(member.attendance).reduce((acc: Record<string, { present: number, absent: number }>, [date, present]) => {
             const month = date.substring(0, 7); // YYYY-MM
             if (!acc[month]) {
                 acc[month] = { present: 0, absent: 0 };
