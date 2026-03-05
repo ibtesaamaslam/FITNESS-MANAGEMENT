@@ -212,13 +212,13 @@ const Fees: React.FC<FeesProps> = ({ members, payments, onToggleReminders, onDel
               <table className="w-full text-left">
                 <thead className="bg-secondary">
                   <tr>
+                    <th className="p-4">RegNo</th>
                     <th className="p-4">Member</th>
                     <th className="p-4">Plan</th>
                     <th className="p-4">Fee Amount</th>
                     <th className="p-4">Status</th>
                     <th className="p-4">Due Date</th>
                     <th className="p-4">Reminders</th>
-                    <th className="p-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -227,6 +227,7 @@ const Fees: React.FC<FeesProps> = ({ members, payments, onToggleReminders, onDel
                     const needsReminder = (!member.feePaid || isExpiringSoon(member.expiryDate)) && (member.remindersEnabled ?? true);
                     return (
                       <tr key={member.id} className={`border-b border-secondary hover:bg-gray-700/50 ${!member.feePaid || isExpired ? 'bg-red-900/20' : ''}`}>
+                        <td className="p-4 font-mono text-text-secondary">{member.registrationNo}</td>
                         <td className="p-4 font-medium">{member.name}</td>
                         <td className="p-4">{member.plan}</td>
                         <td className="p-4">Rs {member.fee.toLocaleString()}</td>
@@ -248,13 +249,6 @@ const Fees: React.FC<FeesProps> = ({ members, payments, onToggleReminders, onDel
                             />
                             <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-4 peer-focus:ring-primary-hover/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                           </label>
-                        </td>
-                        <td className="p-4">
-                          {needsReminder && (
-                            <button onClick={() => handleSendReminder(member)} className="bg-blue-600 text-white text-xs font-bold py-1 px-3 rounded-lg hover:bg-blue-700 transition-colors">
-                              Send Reminder
-                            </button>
-                          )}
                         </td>
                       </tr>
                     );
