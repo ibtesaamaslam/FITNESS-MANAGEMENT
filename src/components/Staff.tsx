@@ -131,15 +131,15 @@ const TimePickerInput: React.FC<{
   };
 
   return (
-    <div className="w-full bg-[#1f2937] border border-gray-700 focus-within:border-[#10b981] rounded-lg px-2.5 h-[38px] flex items-center justify-between text-white font-mono text-xs select-none min-w-0 overflow-hidden">
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+    <div className="w-full bg-[#1f2937] border border-gray-700 focus-within:border-[#10b981] rounded-lg px-2 h-[38px] flex items-center justify-start gap-1.5 sm:gap-2 text-white font-mono text-xs select-none min-w-0 overflow-hidden">
+      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
         {/* Hours input & stepper */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <input
             type="text"
             value={hh}
             onChange={handleHourInput}
-            className="bg-transparent text-white font-bold font-mono text-xs focus:outline-none w-5 text-center"
+            className="bg-transparent text-white font-bold font-mono text-xs focus:outline-none w-4 text-center"
             title="Hour (01-12)"
           />
           <div className="flex flex-col justify-center -space-y-0.5">
@@ -165,12 +165,12 @@ const TimePickerInput: React.FC<{
         <span className="text-gray-400 font-bold text-xs select-none">:</span>
 
         {/* Minutes input & stepper */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <input
             type="text"
             value={mm}
             onChange={handleMinuteInput}
-            className="bg-transparent text-white font-bold font-mono text-xs focus:outline-none w-5 text-center"
+            className="bg-transparent text-white font-bold font-mono text-xs focus:outline-none w-4 text-center"
             title="Minute (00-59)"
           />
           <div className="flex flex-col justify-center -space-y-0.5">
@@ -198,7 +198,7 @@ const TimePickerInput: React.FC<{
       <button
         type="button"
         onClick={togglePeriod}
-        className="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 font-bold px-2 py-0.5 rounded text-[10px] cursor-pointer transition-all uppercase select-none shrink-0 active:scale-95"
+        className="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 font-bold px-1.5 py-0.5 rounded text-[10px] cursor-pointer transition-all uppercase select-none shrink-0 active:scale-95"
         title="Click to switch AM / PM"
       >
         {period}
