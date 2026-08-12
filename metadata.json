@@ -1,0 +1,6 @@
+{
+  "name": "Saqib Fitness Management [UPDATED]",
+  "description": "Comprehensive gym management system for tracking members, fee payments, daily ledgers, expenses, attendance, body measurements, and generating reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

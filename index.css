@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #10B981;
+  --color-primary-hover: #059669;
+  --color-secondary: #252e3e;
+  --color-background: #0f172a;
+  --color-surface: #1e293b;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #9CA3AF;
+}
+
+:root {
+  --color-primary: #10B981;
+  --color-primary-hover: #059669;
+  --color-secondary: #252e3e;
+  --color-background: #0f172a;
+  --color-surface: #1e293b;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #9CA3AF;
+  color-scheme: dark;
+}
+
+/* Ensure crisp white headings in dark mode */
+html:not([data-theme="light"]) h1,
+html:not([data-theme="light"]) h2,
+html:not([data-theme="light"]) h3,
+html:not([data-theme="light"]) h4,
+html:not([data-theme="light"]) h5,
+html:not([data-theme="light"]) h6 {
+  color: #FFFFFF !important;
+}
+
+/* Light mode overrides for high-contrast visibility */
+html[data-theme="light"] {
+  --color-primary: #059669;
+  --color-primary-hover: #047857;
+  --color-secondary: #E5E7EB;
+  --color-background: #F3F4F6;
+  --color-surface: #FFFFFF;
+  --color-text-primary: #111827;
+  --color-text-secondary: #374151;
+  color-scheme: light;
+}
+
+html[data-theme="light"] h1,
+html[data-theme="light"] h2,
+html[data-theme="light"] h3,
+html[data-theme="light"] h4,
+html[data-theme="light"] h5,
+html[data-theme="light"] h6 {
+  color: #111827 !important;
+}
+
+/* Specific component tweaks to ensure light mode handles any dark hardcoded borders/hovers */
+html[data-theme="light"] .border-gray-800,
+html[data-theme="light"] .border-gray-700,
+html[data-theme="light"] .border-gray-800\/80,
+html[data-theme="light"] .border-gray-700\/80 {
+  border-color: #D1D5DB !important;
+}
+html[data-theme="light"] .bg-gray-700 {
+  background-color: #F3F4F6 !important;
+}
+html[data-theme="light"] .bg-gray-800 {
+  background-color: #E5E7EB !important;
+}
+html[data-theme="light"] .text-text-primary {
+  color: #111827 !important;
+}
+html[data-theme="light"] .text-text-secondary {
+  color: #374151 !important;
+}
+html[data-theme="light"] .bg-secondary {
+  background-color: #F3F4F6 !important;
+}
+html[data-theme="light"] .hover\:bg-gray-700\/50:hover,
+html[data-theme="light"] .hover\:bg-gray-700\/30:hover {
+  background-color: rgba(229, 231, 235, 0.8) !important;
+}
+html[data-theme="light"] .hover\:bg-secondary:hover {
+  background-color: #E5E7EB !important;
+}
+html[data-theme="light"] .text-gray-400 {
+  color: #4B5563 !important;
+}
+html[data-theme="light"] .text-yellow-400 {
+  color: #D97706 !important;
+}
+html[data-theme="light"] .text-green-400,
+html[data-theme="light"] .text-emerald-400 {
+  color: #059669 !important;
+}
+html[data-theme="light"] .bg-green-500\/20,
+html[data-theme="light"] .bg-green-500\/15,
+html[data-theme="light"] .bg-emerald-500\/20,
+html[data-theme="light"] .bg-emerald-500\/15 {
+  background-color: rgba(5, 150, 105, 0.15) !important;
+}
+html[data-theme="light"] .bg-blue-500\/20,
+html[data-theme="light"] .bg-blue-500\/15 {
+  background-color: rgba(37, 99, 235, 0.15) !important;
+}
+html[data-theme="light"] .bg-amber-500\/20,
+html[data-theme="light"] .bg-amber-500\/15 {
+  background-color: rgba(217, 119, 6, 0.15) !important;
+}
+html[data-theme="light"] .bg-red-500\/20,
+html[data-theme="light"] .bg-red-500\/15 {
+  background-color: rgba(220, 38, 38, 0.15) !important;
+}
+html[data-theme="light"] .text-red-400 {
+  color: #DC2626 !important;
+}
+html[data-theme="light"] .text-blue-400 {
+  color: #2563EB !important;
+}
