@@ -142,7 +142,7 @@ const TimePickerInput: React.FC<{
             className="bg-transparent text-white font-bold font-mono text-xs focus:outline-none w-4 text-center"
             title="Hour (01-12)"
           />
-          <div className="flex flex-col justify-center -space-y-0.5">
+          <div className="flex flex-col justify-center -space-y-0.5 ml-[1px]">
             <button
               type="button"
               onClick={incrementHour}
@@ -173,7 +173,7 @@ const TimePickerInput: React.FC<{
             className="bg-transparent text-white font-bold font-mono text-xs focus:outline-none w-4 text-center"
             title="Minute (00-59)"
           />
-          <div className="flex flex-col justify-center -space-y-0.5">
+          <div className="flex flex-col justify-center -space-y-0.5 ml-[1px]">
             <button
               type="button"
               onClick={incrementMinute}
@@ -198,7 +198,7 @@ const TimePickerInput: React.FC<{
       <button
         type="button"
         onClick={togglePeriod}
-        className="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 font-bold px-1.5 py-0.5 rounded text-[10px] cursor-pointer transition-all uppercase select-none shrink-0 active:scale-95"
+        className="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 font-bold px-1.5 py-0.5 rounded text-[10px] cursor-pointer transition-all uppercase select-none shrink-0 active:scale-95 ml-[5px] mr-0"
         title="Click to switch AM / PM"
       >
         {period}
