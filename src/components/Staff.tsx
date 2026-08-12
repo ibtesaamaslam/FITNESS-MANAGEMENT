@@ -131,22 +131,22 @@ const TimePickerInput: React.FC<{
   };
 
   return (
-    <div className="w-full bg-[#1f2937] border border-gray-700 focus-within:border-[#10b981] rounded-lg px-2.5 h-[38px] flex items-center justify-between text-white font-mono text-xs select-none">
-      <div className="flex items-center gap-1.5">
+    <div className="w-full bg-[#1f2937] border border-gray-700 focus-within:border-[#10b981] rounded-lg px-2 h-[38px] flex items-center justify-between text-white font-mono text-xs select-none min-w-0 overflow-hidden">
+      <div className="flex items-center gap-1 shrink-0">
         {/* Hours input & stepper */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <input
             type="text"
             value={hh}
             onChange={handleHourInput}
-            className="bg-transparent text-white font-bold font-mono text-xs focus:outline-none w-5 text-center"
+            className="bg-transparent text-white font-bold font-mono text-xs focus:outline-none w-4 text-center"
             title="Hour (01-12)"
           />
           <div className="flex flex-col justify-center -space-y-0.5">
             <button
               type="button"
               onClick={incrementHour}
-              className="text-gray-400 hover:text-white text-[10px] font-bold leading-none px-1 py-0.5 hover:bg-gray-700/80 rounded cursor-pointer transition-colors"
+              className="text-gray-400 hover:text-white text-[9px] font-bold leading-none p-0.5 hover:bg-gray-700/80 rounded cursor-pointer transition-colors"
               title="Increase Hour"
             >
               ▲
@@ -154,7 +154,7 @@ const TimePickerInput: React.FC<{
             <button
               type="button"
               onClick={decrementHour}
-              className="text-gray-400 hover:text-white text-[10px] font-bold leading-none px-1 py-0.5 hover:bg-gray-700/80 rounded cursor-pointer transition-colors"
+              className="text-gray-400 hover:text-white text-[9px] font-bold leading-none p-0.5 hover:bg-gray-700/80 rounded cursor-pointer transition-colors"
               title="Decrease Hour"
             >
               ▼
@@ -165,19 +165,19 @@ const TimePickerInput: React.FC<{
         <span className="text-gray-400 font-bold text-xs select-none">:</span>
 
         {/* Minutes input & stepper */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <input
             type="text"
             value={mm}
             onChange={handleMinuteInput}
-            className="bg-transparent text-white font-bold font-mono text-xs focus:outline-none w-5 text-center"
+            className="bg-transparent text-white font-bold font-mono text-xs focus:outline-none w-4 text-center"
             title="Minute (00-59)"
           />
           <div className="flex flex-col justify-center -space-y-0.5">
             <button
               type="button"
               onClick={incrementMinute}
-              className="text-gray-400 hover:text-white text-[10px] font-bold leading-none px-1 py-0.5 hover:bg-gray-700/80 rounded cursor-pointer transition-colors"
+              className="text-gray-400 hover:text-white text-[9px] font-bold leading-none p-0.5 hover:bg-gray-700/80 rounded cursor-pointer transition-colors"
               title="Increase Minute"
             >
               ▲
@@ -185,7 +185,7 @@ const TimePickerInput: React.FC<{
             <button
               type="button"
               onClick={decrementMinute}
-              className="text-gray-400 hover:text-white text-[10px] font-bold leading-none px-1 py-0.5 hover:bg-gray-700/80 rounded cursor-pointer transition-colors"
+              className="text-gray-400 hover:text-white text-[9px] font-bold leading-none p-0.5 hover:bg-gray-700/80 rounded cursor-pointer transition-colors"
               title="Decrease Minute"
             >
               ▼
@@ -198,7 +198,7 @@ const TimePickerInput: React.FC<{
       <button
         type="button"
         onClick={togglePeriod}
-        className="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 font-bold px-2 py-1 rounded text-[10px] cursor-pointer transition-all uppercase select-none shrink-0 active:scale-95 ml-1"
+        className="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 font-bold px-1.5 py-0.5 rounded text-[10px] cursor-pointer transition-all uppercase select-none shrink-0 active:scale-95"
         title="Click to switch AM / PM"
       >
         {period}
@@ -1209,8 +1209,8 @@ export const Staff: React.FC<StaffProps> = ({
                 </div>
 
                 <div className="bg-[#1a2333] p-3.5 rounded-xl border border-gray-800 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-                    <div>
+                  <div className="flex flex-col sm:flex-row gap-2.5 items-end">
+                    <div className="w-full sm:w-28 shrink-0">
                       <label className="text-[11px] text-gray-400 block mb-1 font-medium">Week Day</label>
                       <select
                         value={newShiftDay}
@@ -1227,12 +1227,12 @@ export const Staff: React.FC<StaffProps> = ({
                       </select>
                     </div>
 
-                    <div>
+                    <div className="w-full sm:flex-1 min-w-0">
                       <label className="text-[11px] text-gray-400 block mb-1 font-medium">Start Time</label>
                       <TimePickerInput value={newShiftStart} onChange={setNewShiftStart} />
                     </div>
 
-                    <div>
+                    <div className="w-full sm:flex-1 min-w-0">
                       <label className="text-[11px] text-gray-400 block mb-1 font-medium">End Time</label>
                       <TimePickerInput value={newShiftEnd} onChange={setNewShiftEnd} />
                     </div>
