@@ -141,6 +141,9 @@ const MemberReportModal: React.FC<{
     };
 
     const handleDeleteMeasurement = (entryId: string) => {
+        if (!window.confirm("Are you sure you want to delete this body measurement entry?")) {
+            return;
+        }
         const currentMeasurements = member.measurements || [];
         const updatedMeasurements = currentMeasurements.filter(m => m.id !== entryId);
 

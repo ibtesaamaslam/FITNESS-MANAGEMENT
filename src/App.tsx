@@ -84,6 +84,8 @@ const App: React.FC = () => {
         accessories,
         accessorySales,
         staff,
+        staffPayrolls,
+        staffAttendanceLogs,
         addMember, 
         updateMember, 
         deleteMember, 
@@ -101,7 +103,11 @@ const App: React.FC = () => {
         updateStaffMember,
         deleteStaffMember,
         assignMemberToTrainer,
-        unassignMemberFromTrainer
+        unassignMemberFromTrainer,
+        recordStaffPayroll,
+        deleteStaffPayroll,
+        recordStaffAttendance,
+        deleteStaffAttendanceLog
     } = useGymData();
 
     // Financial Privacy Hook
@@ -253,12 +259,18 @@ const App: React.FC = () => {
                 return (
                     <Staff
                         staff={staff}
+                        staffPayrolls={staffPayrolls}
+                        staffAttendanceLogs={staffAttendanceLogs}
                         members={members}
                         onAddStaff={addStaffMember}
                         onUpdateStaff={updateStaffMember}
                         onDeleteStaff={deleteStaffMember}
                         onAssignMember={assignMemberToTrainer}
                         onUnassignMember={unassignMemberFromTrainer}
+                        onRecordPayroll={recordStaffPayroll}
+                        onDeletePayroll={deleteStaffPayroll}
+                        onRecordAttendance={recordStaffAttendance}
+                        onDeleteAttendanceLog={deleteStaffAttendanceLog}
                         isUnlocked={isUnlocked}
                         onUnlockRequest={openUnlockModal}
                         onNotify={(msg, type) => showToast(msg, type || 'success')}

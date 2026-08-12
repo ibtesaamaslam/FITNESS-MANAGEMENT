@@ -39,6 +39,22 @@ export interface StaffMember {
   shifts?: StaffShift[];
 }
 
+export interface StaffPayrollRecord {
+  id: string;
+  staffId: string;
+  staffName: string;
+  month: string; // YYYY-MM
+  baseSalary: number;
+  bonus: number;
+  deductions: number;
+  netPay: number;
+  paidAmount: number;
+  status: 'Paid' | 'Unpaid' | 'Partial';
+  paymentDate?: string; // YYYY-MM-DD
+  paymentMethod?: 'Cash' | 'Easypaisa' | 'Jazz Cash' | 'Bank Transfer';
+  notes?: string;
+}
+
 export interface Expense {
   id: string;
   title: string;
@@ -114,6 +130,19 @@ export interface Payment {
 }
 
 export type ToastType = 'success' | 'error' | 'info';
+
+export interface StaffAttendanceLog {
+  id: string;
+  staffId: string;
+  staffName: string;
+  date: string; // YYYY-MM-DD
+  status: 'Present' | 'Late' | 'Half Day' | 'Absent' | 'On Leave';
+  checkInTime?: string; // HH:MM AM/PM or HH:MM
+  checkOutTime?: string; // HH:MM AM/PM or HH:MM
+  workingHours?: number;
+  notes?: string;
+  loggedAt?: string;
+}
 
 export interface ToastMessage {
   id: string;

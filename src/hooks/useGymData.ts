@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Member, Payment, Expense, AccessoryItem, AccessorySale, StaffMember } from '../types';
+import { Member, Payment, Expense, AccessoryItem, AccessorySale, StaffMember, StaffPayrollRecord, StaffAttendanceLog } from '../types';
 import { getLocalDateString } from '../lib/dateUtils';
 
 const sortMembersByRegNo = (list: Member[]): Member[] => {
@@ -10,117 +10,7 @@ const sortMembersByRegNo = (list: Member[]): Member[] => {
     });
 };
 
-const DEFAULT_STAFF: StaffMember[] = [
-    {
-        id: 'st-1',
-        name: 'Coach Bilal',
-        role: 'Trainer',
-        category: 'Trainers',
-        phone: '03001234567',
-        email: 'bilal@gymvault.com',
-        cnic: '35202-1234567-1',
-        avatar: '',
-        joinDate: '2023-01-15',
-        status: 'Active',
-        payrollType: 'Monthly',
-        baseSalary: 45000,
-        shiftHoursPerDay: 8,
-        workingDaysPerMonth: 26,
-        assignedMemberIds: [],
-        emergencyContact: {
-            name: 'Bushra Bilal',
-            relation: 'Wife',
-            phone: '0300-9876543'
-        },
-        notes: 'Lead Strength & Fitness Coach.',
-        shifts: [
-            { day: 'Monday', startTime: '06:00', endTime: '12:00' },
-            { day: 'Wednesday', startTime: '06:00', endTime: '12:00' },
-            { day: 'Friday', startTime: '06:00', endTime: '12:00' }
-        ]
-    },
-    {
-        id: 'st-2',
-        name: 'Sana Khan',
-        role: 'Trainer',
-        category: 'Trainers',
-        phone: '03217654321',
-        email: 'sana@gymvault.com',
-        cnic: '35201-9876543-3',
-        avatar: '',
-        joinDate: '2026-01-03',
-        status: 'Active',
-        payrollType: 'Hourly',
-        baseSalary: 1500,
-        shiftHoursPerDay: 5,
-        workingDaysPerMonth: 26,
-        assignedMemberIds: [],
-        emergencyContact: {
-            name: 'Tariq Khan',
-            relation: 'Brother',
-            phone: '0321-9988776'
-        },
-        notes: 'Senior Female PT Coach & Pilates Specialist.',
-        shifts: [
-            { day: 'Tuesday', startTime: '16:00', endTime: '21:00' },
-            { day: 'Thursday', startTime: '16:00', endTime: '21:00' },
-            { day: 'Saturday', startTime: '16:00', endTime: '21:00' }
-        ]
-    },
-    {
-        id: 'st-3',
-        name: 'Zainab Ahmed',
-        role: 'Receptionist',
-        category: 'Administrative',
-        phone: '03339876543',
-        email: 'zainab@gymvault.com',
-        cnic: '35202-7654321-5',
-        avatar: '',
-        joinDate: '2024-02-01',
-        status: 'Active',
-        payrollType: 'Monthly',
-        baseSalary: 25000,
-        shiftHoursPerDay: 8,
-        workingDaysPerMonth: 26,
-        assignedMemberIds: [],
-        emergencyContact: {
-            name: 'Farhan Ahmed',
-            relation: 'Father',
-            phone: '0333-4455667'
-        },
-        notes: 'Front Desk Representative & Member Support.',
-        shifts: [
-            { day: 'Monday', startTime: '09:00', endTime: '17:00' },
-            { day: 'Tuesday', startTime: '09:00', endTime: '17:00' },
-            { day: 'Wednesday', startTime: '09:00', endTime: '17:00' },
-            { day: 'Thursday', startTime: '09:00', endTime: '17:00' },
-            { day: 'Friday', startTime: '09:00', endTime: '17:00' }
-        ]
-    },
-    {
-        id: 'st-4',
-        name: 'Captain Ali Raza',
-        role: 'Senior Trainer',
-        category: 'Trainers',
-        phone: '0300-1122334',
-        email: 'ali.raza@gymvault.com',
-        cnic: '35200-5544332-9',
-        avatar: '',
-        joinDate: '2022-08-15',
-        status: 'Active',
-        payrollType: 'Monthly',
-        baseSalary: 65000,
-        shiftHoursPerDay: 9,
-        workingDaysPerMonth: 26,
-        assignedMemberIds: [],
-        emergencyContact: {
-            name: 'Amina Raza',
-            relation: 'Wife',
-            phone: '0301-3322110'
-        },
-        notes: 'CrossFit Lead & Bodybuilding Specialist.'
-    }
-];
+const DEFAULT_STAFF: StaffMember[] = [];
 
 export const useGymData = () => {
     const [members, setMembers] = useState<Member[]>(() => {
@@ -192,14 +82,59 @@ export const useGymData = () => {
     const [staff, setStaff] = useState<StaffMember[]>(() => {
         try {
             const stored = localStorage.getItem('gymStaff');
-            if (!stored) return DEFAULT_STAFF;
+            if (!stored) return [];
             const parsed: StaffMember[] = JSON.parse(stored);
-            return parsed && parsed.length > 0 ? parsed : DEFAULT_STAFF;
+            const mockIds = new Set(['st-1', 'st-2', 'st-3', 'st-4']);
+            return (parsed || []).filter(s => 
+                !mockIds.has(s.id) && 
+                !s.email?.includes('atlasgym.com') && 
+                !s.email?.includes('gymvault.com') &&
+                !s.name.includes('Captain Ali') &&
+                !s.name.includes('Usman Malik') &&
+                !s.name.includes('Sara Ahmed') &&
+                !s.name.includes('Tariq Mehmood')
+            );
         } catch (error) {
             console.error("Failed to parse staff from localStorage", error);
-            return DEFAULT_STAFF;
+            return [];
         }
     });
+
+    const [staffPayrolls, setStaffPayrolls] = useState<StaffPayrollRecord[]>(() => {
+        try {
+            const stored = localStorage.getItem('gymStaffPayrolls');
+            return stored ? JSON.parse(stored) : [];
+        } catch (error) {
+            console.error("Failed to parse staff payrolls from localStorage", error);
+            return [];
+        }
+    });
+
+    const [staffAttendanceLogs, setStaffAttendanceLogs] = useState<StaffAttendanceLog[]>(() => {
+        try {
+            const stored = localStorage.getItem('gymStaffAttendanceLogs');
+            return stored ? JSON.parse(stored) : [];
+        } catch (error) {
+            console.error("Failed to parse staff attendance logs from localStorage", error);
+            return [];
+        }
+    });
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('gymStaffAttendanceLogs', JSON.stringify(staffAttendanceLogs));
+        } catch (error) {
+            console.error("Failed to save staff attendance logs to localStorage", error);
+        }
+    }, [staffAttendanceLogs]);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('gymStaffPayrolls', JSON.stringify(staffPayrolls));
+        } catch (error) {
+            console.error("Failed to save staff payrolls to localStorage", error);
+        }
+    }, [staffPayrolls]);
 
     useEffect(() => {
         try {
@@ -479,6 +414,69 @@ export const useGymData = () => {
         setMembers(prev => prev.map(m => m.id === memberId && m.assignedTrainerId === staffId ? { ...m, assignedTrainerId: undefined } : m));
     }, []);
 
+    const recordStaffPayroll = useCallback((recordData: Omit<StaffPayrollRecord, 'id'>) => {
+        const existingIndex = staffPayrolls.findIndex(p => p.staffId === recordData.staffId && p.month === recordData.month);
+        let recordId = `pr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        
+        if (existingIndex >= 0) {
+            recordId = staffPayrolls[existingIndex].id;
+            setStaffPayrolls(prev => prev.map(p => p.id === recordId ? { ...recordData, id: recordId } : p));
+        } else {
+            const newRecord: StaffPayrollRecord = { id: recordId, ...recordData };
+            setStaffPayrolls(prev => [newRecord, ...prev]);
+        }
+
+        // Automatically record/update expense if salary is paid
+        if (recordData.paidAmount > 0 && (recordData.status === 'Paid' || recordData.status === 'Partial')) {
+            const expenseTitle = `Staff Salary: ${recordData.staffName} (${recordData.month})`;
+            setExpenses(prev => {
+                const existingExpIndex = prev.findIndex(e => e.title === expenseTitle);
+                const expenseItem: Expense = {
+                    id: existingExpIndex >= 0 ? prev[existingExpIndex].id : `ex-${recordId}`,
+                    title: expenseTitle,
+                    amount: recordData.paidAmount,
+                    date: recordData.paymentDate || getLocalDateString(),
+                    category: 'Staff Salary'
+                };
+                if (existingExpIndex >= 0) {
+                    return prev.map((e, idx) => idx === existingExpIndex ? expenseItem : e);
+                } else {
+                    return [expenseItem, ...prev];
+                }
+            });
+        }
+    }, [staffPayrolls]);
+
+    const deleteStaffPayroll = useCallback((id: string) => {
+        const record = staffPayrolls.find(p => p.id === id);
+        if (record) {
+            setStaffPayrolls(prev => prev.filter(p => p.id !== id));
+            const expenseTitle = `Staff Salary: ${record.staffName} (${record.month})`;
+            setExpenses(prev => prev.filter(e => e.title !== expenseTitle));
+        }
+    }, [staffPayrolls]);
+
+    const recordStaffAttendance = useCallback((logData: Omit<StaffAttendanceLog, 'id'>) => {
+        setStaffAttendanceLogs(prev => {
+            const existingIdx = prev.findIndex(l => l.staffId === logData.staffId && l.date === logData.date);
+            const logId = existingIdx >= 0 ? prev[existingIdx].id : `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+            const updatedEntry: StaffAttendanceLog = {
+                id: logId,
+                ...logData,
+                loggedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            if (existingIdx >= 0) {
+                return prev.map((l, idx) => idx === existingIdx ? updatedEntry : l);
+            } else {
+                return [updatedEntry, ...prev];
+            }
+        });
+    }, []);
+
+    const deleteStaffAttendanceLog = useCallback((id: string) => {
+        setStaffAttendanceLogs(prev => prev.filter(l => l.id !== id));
+    }, []);
+
     return {
         members,
         payments,
@@ -486,6 +484,8 @@ export const useGymData = () => {
         accessories,
         accessorySales,
         staff,
+        staffPayrolls,
+        staffAttendanceLogs,
         addMember,
         updateMember,
         deleteMember,
@@ -503,6 +503,10 @@ export const useGymData = () => {
         updateStaffMember,
         deleteStaffMember,
         assignMemberToTrainer,
-        unassignMemberFromTrainer
+        unassignMemberFromTrainer,
+        recordStaffPayroll,
+        deleteStaffPayroll,
+        recordStaffAttendance,
+        deleteStaffAttendanceLog
     };
 };
