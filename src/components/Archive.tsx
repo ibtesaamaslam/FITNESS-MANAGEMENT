@@ -60,8 +60,7 @@ const Archive: React.FC<ArchiveProps> = ({ members, role = 'Admin', onDeleteMemb
                 
                 return (
                   <tr key={member.id} className="hover:bg-gray-700/30 transition-colors">
-                    <td className="p-4 flex items-center space-x-3">
-                       <img src={member.photo} alt={member.name} className="h-10 w-10 rounded-full object-cover border border-gray-600 grayscale"/>
+                    <td className="p-4">
                        <div>
                          <div className="flex flex-wrap items-center gap-2">
                            <span className="font-bold text-text-primary">{member.name}</span>

@@ -80,30 +80,72 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
   const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
 
   const filteredMembers = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    const cleanDigitsQuery = query.replace(/[\s-+()]/g, '');
+    const rawTrimmed = searchQuery.trim();
+    if (!rawTrimmed) {
+      return members.filter(member => {
+        if (isMemberArchived(member)) return false;
+        const genderMatch = filterGender === 'All' || (member.gender || 'Male') === filterGender;
+        const planMatch = filterPlan === 'All' || member.plan === filterPlan;
+        const statusMatch = filterStatus === 'All' || (filterStatus === 'Paid' && member.feePaid) || (filterStatus === 'Unpaid' && !member.feePaid);
+        return genderMatch && planMatch && statusMatch;
+      });
+    }
 
-    return members.filter(member => {
-      if (isMemberArchived(member)) return false;
+    const query = rawTrimmed.toLowerCase();
+    const isPureNumeric = /^#?\d+$/.test(query);
+    const queryDigits = query.replace(/\D/g, '');
+    const queryNum = queryDigits !== '' ? parseInt(queryDigits, 10) : NaN;
+
+    const meetsDropdownFilters = (member: Member) => {
       const genderMatch = filterGender === 'All' || (member.gender || 'Male') === filterGender;
       const planMatch = filterPlan === 'All' || member.plan === filterPlan;
       const statusMatch = filterStatus === 'All' || (filterStatus === 'Paid' && member.feePaid) || (filterStatus === 'Unpaid' && !member.feePaid);
-      if (!genderMatch || !planMatch || !statusMatch) return false;
+      return genderMatch && planMatch && statusMatch;
+    };
 
-      if (!query) return true;
+    const matchesExactReg = (m: Member) => {
+      const reg = (m.registrationNo || '').trim().toLowerCase();
+      if (!reg) return false;
+      const regClean = reg.replace(/^#/, '');
+      const queryClean = query.replace(/^#/, '');
+      if (reg === query || regClean === queryClean) return true;
 
-      // Search by Name
+      const regDigits = reg.replace(/\D/g, '');
+      if (!isNaN(queryNum) && regDigits !== '') {
+        const rNum = parseInt(regDigits, 10);
+        if (!isNaN(rNum) && rNum === queryNum) return true;
+      }
+      return false;
+    };
+
+    const activeMembers = members.filter(m => !isMemberArchived(m));
+
+    // When the user searches any number (e.g. "1", "001", "#500"), return ONLY exact matches!
+    if (isPureNumeric) {
+      const exactRegMatches = activeMembers.filter(m => matchesExactReg(m));
+      if (exactRegMatches.length > 0) {
+        return exactRegMatches.filter(meetsDropdownFilters);
+      }
+
+      // Only check phone if a complete full 10-11 digit phone number was entered
+      if (queryDigits.length >= 10) {
+        const phoneMatches = activeMembers.filter(m => {
+          const cleanPhone = (m.phone || '').replace(/\D/g, '');
+          return cleanPhone === queryDigits;
+        });
+        return phoneMatches.filter(meetsDropdownFilters);
+      }
+
+      // When a number is searched and there is no exact registration match, strictly return empty
+      return [];
+    }
+
+    // Standard text search by Name or Registration Number
+    return activeMembers.filter(member => {
+      if (!meetsDropdownFilters(member)) return false;
       const nameMatch = member.name.toLowerCase().includes(query);
-
-      // Search by Registration Number (e.g. 001, SF-001)
       const regMatch = member.registrationNo ? member.registrationNo.toLowerCase().includes(query) : false;
-
-      // Search by Phone number
-      const rawPhone = member.phone ? member.phone.toLowerCase() : '';
-      const cleanPhone = (member.phone || '').replace(/[\s-+()]/g, '');
-      const phoneMatch = rawPhone.includes(query) || (cleanDigitsQuery.length > 0 && cleanPhone.includes(cleanDigitsQuery));
-
-      return nameMatch || regMatch || phoneMatch;
+      return nameMatch || regMatch;
     });
   }, [members, filterGender, filterPlan, filterStatus, searchQuery]);
   
@@ -139,21 +181,53 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
   }, [feePayments]);
 
   const filteredPayments = useMemo(() => {
-    if (!searchQuery.trim()) return paymentsInMonth;
-    const query = searchQuery.trim().toLowerCase();
-    const cleanDigitsQuery = query.replace(/[\s-+()]/g, '');
+    const rawTrimmed = searchQuery.trim();
+    if (!rawTrimmed) return paymentsInMonth;
+
+    const query = rawTrimmed.toLowerCase();
+    const isPureNumeric = /^#?\d+$/.test(query);
+    const queryDigits = query.replace(/\D/g, '');
+    const queryNum = queryDigits !== '' ? parseInt(queryDigits, 10) : NaN;
+
+    const matchesExactReg = (regNo?: string) => {
+      if (!regNo) return false;
+      const reg = regNo.trim().toLowerCase();
+      const regClean = reg.replace(/^#/, '');
+      const queryClean = query.replace(/^#/, '');
+      if (reg === query || regClean === queryClean) return true;
+
+      const regDigits = reg.replace(/\D/g, '');
+      if (!isNaN(queryNum) && regDigits !== '') {
+        const rNum = parseInt(regDigits, 10);
+        if (!isNaN(rNum) && rNum === queryNum) return true;
+      }
+      return false;
+    };
+
+    if (isPureNumeric) {
+      const exactRegPayments = paymentsInMonth.filter(p => matchesExactReg(p.memberRegNo));
+      if (exactRegPayments.length > 0) {
+        return exactRegPayments;
+      }
+
+      if (queryDigits.length >= 10) {
+        const phonePayments = paymentsInMonth.filter(p => {
+          const memberForPayment = members.find(m => m.id === p.memberId);
+          const cleanPhone = (memberForPayment?.phone || '').replace(/\D/g, '');
+          return cleanPhone === queryDigits;
+        });
+        return phonePayments;
+      }
+
+      return [];
+    }
 
     return paymentsInMonth.filter(p => {
       const nameMatch = (p.memberName || '').toLowerCase().includes(query);
       const regMatch = (p.memberRegNo || '').toLowerCase().includes(query);
       const methodMatch = (p.method || '').toLowerCase().includes(query);
       const notesMatch = (p.notes || '').toLowerCase().includes(query);
-
-      const memberForPayment = members.find(m => m.id === p.memberId);
-      const cleanPhone = (memberForPayment?.phone || '').replace(/[\s-+()]/g, '');
-      const phoneMatch = cleanDigitsQuery.length > 0 && cleanPhone.includes(cleanDigitsQuery);
-
-      return nameMatch || regMatch || methodMatch || notesMatch || phoneMatch;
+      return nameMatch || regMatch || methodMatch || notesMatch;
     });
   }, [paymentsInMonth, searchQuery, members]);
 
@@ -445,9 +519,9 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
         <div className="bg-surface rounded-xl shadow-lg border border-gray-800 overflow-hidden">
           {/* Search Bar & Table Header */}
           <div className="p-3.5 sm:p-4 border-b border-gray-800/80 bg-secondary/30 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="relative w-full sm:w-80 md:w-96">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-text-secondary">
-                <SearchIcon className="h-4 w-4" />
+            <div className="relative w-full sm:w-[500px] md:w-[620px] lg:w-[720px]">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                <SearchIcon className="h-5 w-5" />
               </div>
               <input 
                 id="fee-member-search"
@@ -455,15 +529,15 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
                 placeholder="Search by name or number (e.g. 001, phone)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-9 py-2 bg-surface/90 border border-gray-700/80 rounded-xl text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-inner"
+                className="w-full pl-12 pr-11 py-3 bg-secondary/90 border-2 border-gray-700 hover:border-gray-600 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl text-base text-text-primary placeholder-text-secondary/70 focus:outline-none transition-all shadow-md font-medium"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
                   title="Clear search"
                 >
-                  <CloseIcon className="h-3.5 w-3.5" />
+                  <CloseIcon className="h-4 w-4" />
                 </button>
               )}
             </div>
@@ -577,7 +651,7 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
       ) : (
         <div className="space-y-6">
           {/* Revenue Trends Chart */}
-          <div className="bg-surface border border-gray-800 p-6 rounded-lg shadow-lg">
+          <div className="bg-surface border border-gray-800 p-6 rounded-lg shadow-lg relative overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h3 className="text-xl font-bold text-text-primary">Monthly Revenue Trend</h3>
@@ -588,48 +662,73 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
               </span>
             </div>
             
-            <div className="h-64 mt-6">
+            <div className="h-64 mt-6 relative">
               {monthlyRevenueData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={monthlyRevenueData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.25} vertical={false} />
-                    <XAxis 
-                      dataKey="label" 
-                      stroke="#9ca3af" 
-                      fontSize={11} 
-                      tickLine={false} 
-                      axisLine={false}
-                      dy={10}
-                    />
-                    <YAxis 
-                      stroke="#9ca3af" 
-                      fontSize={11} 
-                      tickLine={false} 
-                      axisLine={false}
-                      tickFormatter={(v) => `Rs ${(v / 1000).toFixed(0)}k`}
-                      dx={-10}
-                    />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151', borderRadius: '12px' }} 
-                      labelStyle={{ fontWeight: 'bold', color: '#f3f4f6' }}
-                      formatter={(value: any) => [`Rs ${Number(value).toLocaleString()}`, 'Revenue']}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="Revenue" 
-                      stroke="#10b981" 
-                      strokeWidth={3} 
-                      fillOpacity={1} 
-                      fill="url(#colorRevenue)" 
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={monthlyRevenueData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.25} vertical={false} />
+                      <XAxis 
+                        dataKey="label" 
+                        stroke="#9ca3af" 
+                        fontSize={11} 
+                        tickLine={false} 
+                        axisLine={false}
+                        dy={10}
+                      />
+                      <YAxis 
+                        stroke="#9ca3af" 
+                        fontSize={11} 
+                        tickLine={false} 
+                        axisLine={false}
+                        tickFormatter={(v) => isUnlocked ? `Rs ${(v / 1000).toFixed(0)}k` : '••••'}
+                        dx={-10}
+                      />
+                      {isUnlocked && (
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151', borderRadius: '12px' }} 
+                          labelStyle={{ fontWeight: 'bold', color: '#f3f4f6' }}
+                          formatter={(value: any) => [`Rs ${Number(value).toLocaleString()}`, 'Revenue']}
+                        />
+                      )}
+                      <Area 
+                        type="monotone" 
+                        dataKey="Revenue" 
+                        stroke="#10b981" 
+                        strokeWidth={3} 
+                        fillOpacity={1} 
+                        fill="url(#colorRevenue)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+
+                  {!isUnlocked && (
+                    <div 
+                      onClick={onUnlockRequest}
+                      className="absolute inset-0 bg-surface/85 backdrop-blur-md rounded-xl flex flex-col items-center justify-center p-6 cursor-pointer border border-dashed border-gray-700/80 hover:border-primary/60 transition-all group z-10"
+                      title="Click to unlock financial data"
+                    >
+                      <div className="p-3 bg-secondary/80 rounded-2xl border border-gray-700 group-hover:border-primary/50 text-amber-400 group-hover:scale-110 transition-all shadow-lg mb-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </div>
+                      <p className="text-sm font-bold text-text-primary mb-1">Monthly Revenue Amounts Hidden</p>
+                      <p className="text-xs text-text-secondary text-center max-w-sm mb-3">
+                        Trend amounts and financial analytics are locked for privacy. Click to enter your owner password to reveal.
+                      </p>
+                      <span className="px-3.5 py-1.5 rounded-lg bg-primary/20 text-primary border border-primary/40 text-xs font-semibold group-hover:bg-primary group-hover:text-white transition-all">
+                        Unlock Financial Data
+                      </span>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="flex h-full items-center justify-center text-text-secondary italic">
                   No payment transaction entries recorded yet to display trend.
@@ -642,9 +741,9 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
           <div className="bg-surface rounded-xl shadow-lg border border-gray-800 overflow-hidden">
             {/* Search Bar & Table Header for Ledger */}
             <div className="p-3.5 sm:p-4 border-b border-gray-800/80 bg-secondary/30 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="relative w-full sm:w-80 md:w-96">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-text-secondary">
-                  <SearchIcon className="h-4 w-4" />
+              <div className="relative w-full sm:w-[500px] md:w-[620px] lg:w-[720px]">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                  <SearchIcon className="h-5 w-5" />
                 </div>
                 <input 
                   id="fee-ledger-search"
@@ -652,15 +751,15 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
                   placeholder="Search ledger by name, Reg No, or method..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-9 py-2 bg-surface/90 border border-gray-700/80 rounded-xl text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-inner"
+                  className="w-full pl-12 pr-11 py-3 bg-secondary/90 border-2 border-gray-700 hover:border-gray-600 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl text-base text-text-primary placeholder-text-secondary/70 focus:outline-none transition-all shadow-md font-medium"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
                     title="Clear search"
                   >
-                    <CloseIcon className="h-3.5 w-3.5" />
+                    <CloseIcon className="h-4 w-4" />
                   </button>
                 )}
               </div>

@@ -174,23 +174,34 @@ export const useGymData = () => {
     }, [accessorySales]);
 
     const addMember = useCallback((memberData: Omit<Member, 'id'>, paymentMethod: Payment['method']) => {
+        const fee = Number(memberData.fee) || 0;
+        const actualPaid = memberData.feePaid 
+            ? fee 
+            : Math.min(fee, Math.max(0, Number(memberData.paidAmount) || 0));
+        
+        const isFullyPaid = actualPaid >= fee && fee > 0;
         const newMember: Member = {
             id: `m${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             ...memberData,
+            fee,
+            feePaid: isFullyPaid,
+            paidAmount: actualPaid,
+            pendingDue: Math.max(0, fee - actualPaid),
             remindersEnabled: memberData.remindersEnabled ?? true,
         };
         
         let newPayment: Payment | null = null;
-        if (newMember.feePaid) {
+        if (actualPaid > 0) {
             newPayment = {
                 id: `p${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
                 memberId: newMember.id,
                 memberRegNo: newMember.registrationNo,
                 memberName: newMember.name,
                 date: getLocalDateString(),
-                amount: newMember.fee,
+                amount: actualPaid,
                 method: paymentMethod,
                 type: 'Fee',
+                notes: isFullyPaid ? 'Full Fee Payment' : `Partial Payment (Remaining Due: Rs ${(fee - actualPaid).toLocaleString()})`,
             };
         }
 
@@ -200,35 +211,69 @@ export const useGymData = () => {
         }
     }, []);
 
-    const updateMember = useCallback((updatedMember: Member, paymentMethod: Payment['method']) => {
+    const updateMember = useCallback((updatedMember: Member, paymentMethod: Payment['method'] = 'Cash') => {
         const oldMember = members.find(m => m.id === updatedMember.id);
+        const fee = Number(updatedMember.fee) || 0;
         
-        const isFeeStatusUpdate = oldMember && !oldMember.feePaid && updatedMember.feePaid;
+        // Compute what was previously paid
+        const oldPaid = oldMember 
+            ? (oldMember.feePaid ? (Number(oldMember.fee) || 0) : Math.max(0, Number(oldMember.paidAmount) || 0))
+            : 0;
+            
+        // Compute what is now paid
+        let newPaid = updatedMember.feePaid 
+            ? fee 
+            : Math.max(0, Number(updatedMember.paidAmount) || 0);
+            
+        if (newPaid >= fee && fee > 0) {
+            newPaid = fee;
+        }
+
+        const isFullyPaid = updatedMember.feePaid || (newPaid >= fee && fee > 0);
+        const finalMember: Member = {
+            ...updatedMember,
+            fee,
+            feePaid: isFullyPaid,
+            paidAmount: newPaid,
+            pendingDue: Math.max(0, fee - newPaid),
+        };
+
         const isRenewalUpdate = oldMember && updatedMember.feePaid && oldMember.feePaid && updatedMember.expiryDate !== oldMember.expiryDate;
-        const isAmountUpdate = oldMember && updatedMember.feePaid && oldMember.feePaid && updatedMember.fee !== oldMember.fee;
+        
+        // Difference in payment received
+        let paymentAmountToAdd = 0;
+        let paymentNote: string | undefined = undefined;
+
+        if (isRenewalUpdate) {
+            paymentAmountToAdd = fee;
+            paymentNote = 'Membership Renewal';
+        } else if (newPaid > oldPaid) {
+            paymentAmountToAdd = newPaid - oldPaid;
+            paymentNote = isFullyPaid ? 'Cleared Remaining Balance' : `Partial Payment (Remaining Due: Rs ${(fee - newPaid).toLocaleString()})`;
+        }
 
         let addedPayment: Payment | null = null;
-        if (oldMember && (isFeeStatusUpdate || isRenewalUpdate || isAmountUpdate)) {
-            // Member just paid, renewed, or adjusted payment, record payment
-             addedPayment = {
+        if (paymentAmountToAdd > 0) {
+            addedPayment = {
                 id: `p${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-                memberId: updatedMember.id,
-                memberRegNo: updatedMember.registrationNo,
-                memberName: updatedMember.name,
+                memberId: finalMember.id,
+                memberRegNo: finalMember.registrationNo,
+                memberName: finalMember.name,
                 date: getLocalDateString(),
-                amount: updatedMember.fee,
-                method: paymentMethod,
+                amount: paymentAmountToAdd,
+                method: paymentMethod || 'Cash',
                 type: 'Fee',
+                notes: paymentNote,
             };
         }
 
         setPayments(prev => {
             const updatedPayments = prev.map(p => {
-                if (p.memberId === updatedMember.id) {
+                if (p.memberId === finalMember.id) {
                     return {
                         ...p,
-                        memberName: updatedMember.name,
-                        memberRegNo: updatedMember.registrationNo,
+                        memberName: finalMember.name,
+                        memberRegNo: finalMember.registrationNo,
                     };
                 }
                 return p;
@@ -236,7 +281,7 @@ export const useGymData = () => {
             return addedPayment ? [...updatedPayments, addedPayment] : updatedPayments;
         });
 
-        setMembers(prev => sortMembersByRegNo(prev.map(m => m.id === updatedMember.id ? { ...m, ...updatedMember } : m)));
+        setMembers(prev => sortMembersByRegNo(prev.map(m => m.id === finalMember.id ? finalMember : m)));
     }, [members]);
 
     const deleteMember = useCallback((id: string) => {

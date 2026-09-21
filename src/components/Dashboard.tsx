@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Member, Payment, View, AccessorySale, Role } from '../types';
 import { 
   TrashIcon, 
@@ -275,8 +275,8 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
 
       {/* Main Content Grid (Weekly Attendance & Quick Actions) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-surface p-6 rounded-xl shadow-lg border border-gray-800/80 flex flex-col justify-between">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div className="lg:col-span-2 bg-surface p-5 sm:p-6 pb-3 sm:pb-4 rounded-xl shadow-lg border border-gray-800/80 flex flex-col">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
               <h2 className="text-base font-bold text-text-primary tracking-tight">
                 Weekly Attendance Trend
@@ -298,11 +298,11 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
             </div>
           </div>
 
-          <div className="flex-1 w-full pt-1 pb-1 min-h-[320px]">
-            <ResponsiveContainer width="100%" height={320}>
+          <div className="flex-1 w-full min-h-[300px] h-[340px]">
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart 
                 data={attendanceData} 
-                margin={{ top: 12, right: 15, left: -10, bottom: 0 }} 
+                margin={{ top: 10, right: 15, left: -10, bottom: 4 }} 
                 barGap={4}
                 barCategoryGap="24%"
               >
@@ -352,10 +352,6 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
                     return null;
                   }}
                 />
-                <Legend 
-                  wrapperStyle={{ color: '#9CA3AF', fontSize: '13px', paddingTop: '10px' }} 
-                  iconType="circle"
-                />
                 <Bar 
                   dataKey="Male" 
                   fill="#3B82F6" 
@@ -376,63 +372,63 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
         </div>
 
         {/* Quick Actions Panel */}
-        <div className="bg-surface p-6 rounded-xl shadow-lg border border-gray-800/80 flex flex-col justify-between">
-          <h2 className="text-base font-bold mb-4 text-text-primary tracking-tight">Quick Actions</h2>
-          <div className="space-y-2.5 my-auto">
+        <div className="bg-surface p-5 sm:p-6 rounded-xl shadow-lg border border-gray-800/80 flex flex-col justify-between">
+          <h2 className="text-base font-bold mb-3 text-text-primary tracking-tight">Quick Actions</h2>
+          <div className="space-y-2 my-auto">
             <button 
               onClick={() => onNavigate('members')} 
-              className="w-full bg-[#10b981] hover:bg-[#059669] text-white font-bold py-2.5 px-4 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#10b981] hover:bg-[#059669] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
             >
-              <UserPlusIcon className="h-5 w-5" />
+              <UserPlusIcon className="h-4 w-4" />
               <span>Add Member</span>
             </button>
             <button 
               onClick={() => onNavigate('fees')} 
-              className="w-full bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-2.5 px-4 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
             >
-              <ReceiptIcon className="h-5 w-5" />
+              <ReceiptIcon className="h-4 w-4" />
               <span>Record Payment</span>
             </button>
             <button 
               onClick={() => onNavigate('attendance')} 
-              className="w-full bg-[#eab308] hover:bg-[#ca8a04] text-white font-bold py-2.5 px-4 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#eab308] hover:bg-[#ca8a04] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
             >
-              <ClipboardListIcon className="h-5 w-5" />
+              <ClipboardListIcon className="h-4 w-4" />
               <span>Mark Attendance</span>
             </button>
             <button 
               onClick={() => onNavigate('dailyledger')} 
-              className="w-full bg-[#f97316] hover:bg-[#ea580c] text-white font-bold py-2.5 px-4 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#f97316] hover:bg-[#ea580c] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
             >
-              <LedgerIcon className="h-5 w-5" />
+              <LedgerIcon className="h-4 w-4" />
               <span>Daily Ledger</span>
             </button>
             <button 
               onClick={() => onNavigate('expenses')} 
-              className="w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-2.5 px-4 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
             >
-              <ExpenseIcon className="h-5 w-5" />
+              <ExpenseIcon className="h-4 w-4" />
               <span>Monthly Expense</span>
             </button>
             <button 
               onClick={() => onNavigate('accessories')} 
-              className="w-full bg-[#ec4899] hover:bg-[#db2777] text-white font-bold py-2.5 px-4 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#ec4899] hover:bg-[#db2777] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
             >
-              <AccessoriesIcon className="h-5 w-5" />
+              <AccessoriesIcon className="h-4 w-4" />
               <span>Store Accessories</span>
             </button>
             <button 
               onClick={() => onNavigate('staff')} 
-              className="w-full bg-[#14b8a6] hover:bg-[#0d9488] text-white font-bold py-2.5 px-4 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#14b8a6] hover:bg-[#0d9488] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
             >
-              <StaffIcon className="h-5 w-5" />
+              <StaffIcon className="h-4 w-4" />
               <span>Staff & Payroll</span>
             </button>
             <button 
               onClick={() => onNavigate('backup')} 
-              className="w-full bg-[#ef4444] hover:bg-[#dc2626] text-white font-bold py-2.5 px-4 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#ef4444] hover:bg-[#dc2626] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
             >
-              <BackupIcon className="h-5 w-5" />
+              <BackupIcon className="h-4 w-4" />
               <span>Backup & Restore</span>
             </button>
           </div>

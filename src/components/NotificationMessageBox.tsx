@@ -51,13 +51,6 @@ export const NotificationMessageBox: React.FC<NotificationMessageBoxProps> = ({
           {expiredMembers.length > 0 ? (
             expiredMembers.map(m => (
               <div key={m.id} className="p-4 bg-secondary rounded-xl border border-gray-800 hover:border-red-500/30 transition-all flex items-center justify-between gap-4">
-                <div className="flex items-center space-x-3.5">
-                  <img 
-                    src={m.photo || `https://ui-avatars.com/api/?name=${m.name || '?'}&background=374151&color=F9FAFB`} 
-                    alt={m.name} 
-                    className="h-12 w-12 rounded-full object-cover border border-gray-750" 
-                    referrerPolicy="no-referrer"
-                  />
                   <div>
                     <h4 className="font-bold text-text-primary text-base">{m.name}</h4>
                     <div className="flex flex-wrap items-center gap-2 mt-1 text-xs">
@@ -70,7 +63,6 @@ export const NotificationMessageBox: React.FC<NotificationMessageBoxProps> = ({
                       <span className="text-text-secondary">{m.plan}</span>
                     </div>
                   </div>
-                </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm font-bold text-red-400 font-mono">Rs {m.fee.toLocaleString()}</p>
                   <p className="text-[10px] text-text-secondary font-mono mt-0.5 font-semibold">Expired: {m.expiryDate}</p>

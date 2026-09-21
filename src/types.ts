@@ -159,9 +159,11 @@ export interface Member {
   plan: 'Monthly' | 'Quarterly' | 'Yearly';
   fee: number;
   feePaid: boolean;
+  paidAmount?: number;
+  pendingDue?: number;
   joinDate: string; // YYYY-MM-DD
   expiryDate: string; // YYYY-MM-DD
-  photo: string;
+  photo?: string;
   remindersEnabled?: boolean;
   attendance: { [date: string]: boolean }; // date: YYYY-MM-DD
   category?: 'Strength' | 'Cardio' | 'Personal Training';

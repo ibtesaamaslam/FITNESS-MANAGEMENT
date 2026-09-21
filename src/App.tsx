@@ -247,7 +247,7 @@ const App: React.FC = () => {
             case 'fees':
                 return <Fees members={members} payments={payments} accessorySales={accessorySales} role={role} onToggleReminders={handleToggleReminders} onDeletePayment={handleDeletePayment} isUnlocked={isUnlocked} onUnlockRequest={openUnlockModal} />;
             case 'attendance':
-                return <Attendance members={members} role={role} onUpdateAttendance={handleUpdateAttendance} onWarning={(msg) => showToast(msg, 'error')} />;
+                return <Attendance members={members} role={role} onUpdateAttendance={handleUpdateAttendance} onWarning={(msg) => showToast(msg, 'error')} onUpdateMember={handleUpdateMember} isUnlocked={isUnlocked} onUnlockRequest={openUnlockModal} />;
             case 'report':
                 return <Report members={members} payments={payments} />;
             case 'dailyledger':

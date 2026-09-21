@@ -51,6 +51,7 @@ export const Accessories: React.FC<AccessoriesProps> = ({
   const [selectedItemForSell, setSelectedItemForSell] = useState<AccessoryItem | null>(null);
   const [itemToDelete, setItemToDelete] = useState<AccessoryItem | null>(null);
   const [saleToDelete, setSaleToDelete] = useState<AccessorySale | null>(null);
+  const [isLowStockModalOpen, setIsLowStockModalOpen] = useState(false);
 
   // Form states - Item
   const [itemName, setItemName] = useState('');
@@ -307,17 +308,34 @@ export const Accessories: React.FC<AccessoriesProps> = ({
           </div>
         </div>
 
-        <div className="bg-surface p-5 rounded-xl shadow-lg border border-gray-800 flex items-center justify-between">
+        <div 
+          onClick={() => setIsLowStockModalOpen(true)}
+          className="bg-surface p-5 rounded-xl shadow-lg border border-gray-800 hover:border-amber-500/50 hover:bg-gray-850/60 transition-all cursor-pointer flex items-center justify-between group relative overflow-hidden"
+          title="Click to view all low stock items"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsLowStockModalOpen(true);
+            }
+          }}
+        >
           <div>
-            <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">Low Stock Alerts</p>
+            <div className="flex items-center gap-1.5 mb-1">
+              <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Low Stock Alerts</p>
+              <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20 group-hover:bg-amber-500/20 transition-colors">
+                View List &rarr;
+              </span>
+            </div>
             <p className={`text-2xl font-black ${lowStockItems.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
               {lowStockItems.length} <span className="text-xs font-normal text-text-secondary">items low</span>
             </p>
-            <p className="text-[11px] text-text-secondary mt-1">
-              {lowStockItems.length > 0 ? 'Reorder needed soon' : 'All items well stocked'}
+            <p className="text-[11px] text-text-secondary mt-1 group-hover:text-amber-300/80 transition-colors">
+              {lowStockItems.length > 0 ? 'Reorder needed soon (click to inspect)' : 'All items well stocked'}
             </p>
           </div>
-          <div className={`p-3 rounded-full border ${lowStockItems.length > 0 ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'}`}>
+          <div className={`p-3 rounded-full border transition-transform group-hover:scale-110 ${lowStockItems.length > 0 ? 'bg-amber-500/15 border-amber-500/30 text-amber-400 group-hover:bg-amber-500/25' : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
@@ -944,6 +962,164 @@ export const Accessories: React.FC<AccessoriesProps> = ({
                 className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold text-xs rounded-xl shadow-lg cursor-pointer"
               >
                 Refund & Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: LOW STOCK ITEMS LIST */}
+      {isLowStockModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-surface border border-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="p-5 border-b border-gray-800 flex items-center justify-between bg-gradient-to-r from-amber-500/10 via-surface to-surface">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/15 border border-amber-500/30 rounded-xl text-amber-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                    <span>Low Stock Items Alert</span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono font-bold">
+                      {lowStockItems.length} {lowStockItems.length === 1 ? 'Item' : 'Items'}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    Products with inventory of 3 units or fewer that require immediate reorder
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLowStockModalOpen(false)}
+                className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
+                title="Close"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content List */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-3">
+              {lowStockItems.length === 0 ? (
+                <div className="py-12 text-center flex flex-col items-center justify-center space-y-3">
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-text-primary">Stock Healthy</h4>
+                    <p className="text-xs text-text-secondary mt-1">All inventory items have sufficient stock (above 3 units).</p>
+                  </div>
+                </div>
+              ) : (
+                lowStockItems.map(item => {
+                  const isCritical = item.stock === 0;
+                  return (
+                    <div 
+                      key={item.id}
+                      className={`p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                        isCritical 
+                          ? 'bg-red-950/20 border-red-500/40 hover:border-red-500/60' 
+                          : 'bg-secondary/40 border-amber-500/30 hover:border-amber-500/50'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3.5">
+                        <div className={`p-2.5 rounded-xl border shrink-0 mt-0.5 ${
+                          isCritical 
+                            ? 'bg-red-500/15 border-red-500/30 text-red-400' 
+                            : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                        }`}>
+                          <AccessoriesIcon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-bold text-text-primary text-sm">{item.name}</h4>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-800 text-gray-300 border border-gray-700">
+                              {item.category}
+                            </span>
+                          </div>
+                          {item.description && (
+                            <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{item.description}</p>
+                          )}
+                          <div className="flex items-center gap-3 mt-1.5 text-xs text-text-secondary">
+                            <span>Cost: <strong className="text-text-primary">Rs {item.costPrice.toLocaleString()}</strong></span>
+                            <span>&bull;</span>
+                            <span>Selling: <strong className="text-emerald-400 font-bold">Rs {item.sellingPrice.toLocaleString()}</strong></span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Stock Badge & Action */}
+                      <div className="flex items-center gap-3 self-end sm:self-center">
+                        <div className="text-right">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-mono font-black border ${
+                            isCritical 
+                              ? 'bg-red-500/20 text-red-400 border-red-500/40 shadow-sm' 
+                              : 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
+                          }`}>
+                            <span className="h-2 w-2 rounded-full animate-ping inline-block" style={{ backgroundColor: isCritical ? '#f87171' : '#f59e0b' }} />
+                            <span>{item.stock} {item.stock === 1 ? 'unit' : 'units'} left</span>
+                          </span>
+                          <p className="text-[10px] text-text-secondary mt-0.5 font-medium">
+                            {isCritical ? 'Out of stock' : 'Low stock warning'}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsLowStockModalOpen(false);
+                              handleOpenAddItemModal(item);
+                            }}
+                            className="px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 border border-blue-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                            title="Restock or Edit Quantity"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                            <span>Restock</span>
+                          </button>
+
+                          {item.stock > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsLowStockModalOpen(false);
+                                handleOpenSellModal(item);
+                              }}
+                              className="px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                              title="Sell Remaining"
+                            >
+                              Sell
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-secondary/50 border-t border-gray-800 flex items-center justify-between">
+              <span className="text-xs text-text-secondary">
+                Tip: Click <strong>Restock</strong> to update the inventory units instantly.
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsLowStockModalOpen(false)}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                Close
               </button>
             </div>
           </div>

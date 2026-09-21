@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { Member, Payment } from '../types';
 import { getLocalDateString } from '../lib/dateUtils';
 import { MaskedAmount } from './MaskedAmount';
-import { CashIcon, BankIcon, PhonePayIcon } from './icons';
+import { CashIcon, BankIcon, PhonePayIcon, SearchIcon, CloseIcon } from './icons';
 import { GenderBadge } from './Members';
 
 interface DailyLedgerProps {
@@ -21,12 +21,42 @@ const CATEGORY_COLORS: { [key: string]: string } = {
 
 const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked = false, onUnlockRequest }) => {
   const [selectedDate, setSelectedDate] = useState(getLocalDateString());
+  const [searchQuery, setSearchQuery] = useState('');
 
   const dailyPayments = useMemo(() => {
     return payments
       .filter(p => p.date === selectedDate)
       .sort((a, b) => b.id.localeCompare(a.id));
   }, [payments, selectedDate]);
+
+  const filteredDailyPayments = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return dailyPayments;
+
+    const cleanQ = q.replace(/^#/, '');
+    const isNumeric = /^\d+$/.test(cleanQ);
+
+    // When searching by a number, strictly match the exact registration number
+    if (isNumeric) {
+      const qNum = parseInt(cleanQ, 10);
+      return dailyPayments.filter(p => {
+        const regStr = String(p.memberRegNo || '').trim().toLowerCase().replace(/^#/, '');
+        if (regStr === cleanQ) return true;
+        const regDigits = regStr.replace(/\D/g, '');
+        const regNum = regDigits !== '' ? parseInt(regDigits, 10) : NaN;
+        return !isNaN(regNum) && regNum === qNum;
+      });
+    }
+
+    return dailyPayments.filter(p => {
+      const name = (p.memberName || '').toLowerCase();
+      const reg = (p.memberRegNo || '').toLowerCase();
+      const method = (p.method || '').toLowerCase();
+      const notes = (p.notes || '').toLowerCase();
+
+      return name.includes(q) || reg.includes(q) || method.includes(q) || notes.includes(q);
+    });
+  }, [dailyPayments, searchQuery]);
 
   const dailyTotal = useMemo(() => {
     return dailyPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -166,12 +196,50 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
         {/* Right column: Detailed transactions for selected date */}
         <div className="lg:col-span-2">
           <div className="bg-surface rounded-xl shadow-lg border border-gray-800 overflow-hidden">
-            <div className="p-4 bg-secondary border-b border-gray-700 flex justify-between items-center">
+            <div className="p-4 bg-secondary border-b border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
               <h2 className="font-bold text-xl">Transactions on {selectedDate}</h2>
               <span className="bg-primary/20 text-primary px-3 py-1 rounded-full text-xs font-bold uppercase">
                 {dailyPayments.length} Records
               </span>
             </div>
+
+            {/* Search Bar for Daily Ledger */}
+            <div className="p-3.5 sm:p-4 border-b border-gray-800/80 bg-secondary/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="relative w-full sm:w-[480px] md:w-[560px]">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                  <SearchIcon className="h-5 w-5" />
+                </div>
+                <input 
+                  id="daily-ledger-search"
+                  type="text"
+                  placeholder="Search transactions by name, Reg No, or method..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-11 py-3 bg-secondary/90 border-2 border-gray-700 hover:border-gray-600 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl text-base text-text-primary placeholder-text-secondary/70 focus:outline-none transition-all shadow-md font-medium"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                    title="Clear search"
+                  >
+                    <CloseIcon className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2.5 text-xs text-text-secondary w-full sm:w-auto justify-between sm:justify-end">
+                {searchQuery.trim() && (
+                  <span className="text-primary font-semibold bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20">
+                    Matches: {filteredDailyPayments.length}
+                  </span>
+                )}
+                <span className="text-gray-400">
+                  Showing <strong className="text-text-primary font-mono">{filteredDailyPayments.length}</strong> of <strong className="text-text-primary font-mono">{dailyPayments.length}</strong> records
+                </span>
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead className="bg-gray-800/50 text-text-secondary text-xs uppercase">
@@ -182,7 +250,7 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
-                  {dailyPayments.length > 0 ? dailyPayments.map(p => {
+                  {filteredDailyPayments.length > 0 ? filteredDailyPayments.map(p => {
                     const isAccessory = p.type === 'Accessory' || p.memberRegNo === 'ACC';
                     const memberForPayment = members.find(m => m.id === p.memberId);
                     const category = memberForPayment ? memberForPayment.category : 'Strength';
@@ -223,7 +291,7 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
                   }) : (
                     <tr>
                       <td colSpan={3} className="p-12 text-center text-text-secondary italic">
-                        No transactions recorded for this date.
+                        {searchQuery.trim() ? `No transactions match "${searchQuery}".` : 'No transactions recorded for this date.'}
                       </td>
                     </tr>
                   )}

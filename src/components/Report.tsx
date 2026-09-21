@@ -54,18 +54,15 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
     return (
         <div className="bg-surface rounded-lg shadow-xl p-6 md:p-8 w-full mt-6 flex flex-col">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-700">
-                <div className="flex items-center space-x-4">
-                    <img src={member.photo || `https://ui-avatars.com/api/?name=${member.name || '?'}&background=374151&color=F9FAFB`} alt="Profile" className="h-24 w-24 rounded-full object-cover bg-secondary" />
-                    <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <h2 className="text-3xl font-bold text-text-primary">{member.name}</h2>
-                            <GenderBadge gender={member.gender || 'Male'} size="md" />
-                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${CATEGORY_COLORS[member.category || 'Strength'] || 'bg-gray-500/20 text-gray-400'}`}>
-                                {member.category || 'Strength'}
-                            </span>
-                        </div>
-                        <p className="text-text-secondary font-mono text-lg mt-0.5">{member.registrationNo}</p>
+                <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-3xl font-bold text-text-primary">{member.name}</h2>
+                        <GenderBadge gender={member.gender || 'Male'} size="md" />
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${CATEGORY_COLORS[member.category || 'Strength'] || 'bg-gray-500/20 text-gray-400'}`}>
+                            {member.category || 'Strength'}
+                        </span>
                     </div>
+                    <p className="text-text-secondary font-mono text-lg mt-0.5">{member.registrationNo}</p>
                 </div>
                 <div>
                     <span className={`px-4 py-2 rounded-xl text-sm font-bold border ${
@@ -181,14 +178,62 @@ const Report: React.FC<ReportProps> = ({ members, payments }) => {
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         setHasSearched(true);
-        if (!searchTerm.trim()) {
+        const rawTrimmed = searchTerm.trim();
+        if (!rawTrimmed) {
             setFilteredMembers([]);
             setSelectedMember(null);
             return;
         }
+
+        const query = rawTrimmed.toLowerCase();
+        const isPureNumeric = /^#?\d+$/.test(query);
+        const queryDigits = query.replace(/\D/g, '');
+        const queryNum = queryDigits !== '' ? parseInt(queryDigits, 10) : NaN;
+
+        const matchesExactReg = (regNo?: string) => {
+            if (!regNo) return false;
+            const reg = regNo.trim().toLowerCase();
+            const regClean = reg.replace(/^#/, '');
+            const queryClean = query.replace(/^#/, '');
+            if (reg === query || regClean === queryClean) return true;
+
+            const regDigits = reg.replace(/\D/g, '');
+            if (!isNaN(queryNum) && regDigits !== '') {
+                const rNum = parseInt(regDigits, 10);
+                if (!isNaN(rNum) && rNum === queryNum) return true;
+            }
+            return false;
+        };
+
+        if (isPureNumeric) {
+            const exactMatches = members.filter(m => matchesExactReg(m.registrationNo));
+            if (exactMatches.length > 0) {
+                setFilteredMembers(exactMatches);
+                setSelectedMember(exactMatches.length === 1 ? exactMatches[0] : null);
+                return;
+            }
+
+            const cleanDigitsQuery = queryDigits;
+            if (cleanDigitsQuery.length >= 7 || cleanDigitsQuery.startsWith('03')) {
+                const phoneMatches = members.filter(m => {
+                    const cleanPhone = (m.phone || '').replace(/[\s-+()]/g, '');
+                    return cleanPhone === cleanDigitsQuery || cleanPhone.startsWith(cleanDigitsQuery);
+                });
+                if (phoneMatches.length > 0) {
+                    setFilteredMembers(phoneMatches);
+                    setSelectedMember(phoneMatches.length === 1 ? phoneMatches[0] : null);
+                    return;
+                }
+            }
+
+            setFilteredMembers([]);
+            setSelectedMember(null);
+            return;
+        }
+
         const results = members.filter(m => 
-            m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            m.registrationNo.toLowerCase().includes(searchTerm.toLowerCase())
+            m.name.toLowerCase().includes(query) || 
+            m.registrationNo.toLowerCase().includes(query)
         );
         setFilteredMembers(results);
         setSelectedMember(results.length === 1 ? results[0] : null);
@@ -231,7 +276,6 @@ const Report: React.FC<ReportProps> = ({ members, payments }) => {
                                     onClick={() => handleSelectMember(member)}
                                     className="w-full text-left p-3 bg-secondary rounded-lg hover:bg-gray-700 flex items-center space-x-4 cursor-pointer"
                                 >
-                                    <img src={member.photo} alt={member.name} className="h-10 w-10 rounded-full object-cover" />
                                     <div className="flex-grow">
                                         <div className="flex items-center space-x-2">
                                             <p className="font-semibold">{member.name}</p>
