@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Member, Role } from '../types';
 import { TrashIcon } from './icons';
 import { isMemberArchived } from '../lib/dateUtils';
@@ -18,20 +18,107 @@ const CATEGORY_COLORS: { [key: string]: string } = {
 };
 
 const Archive: React.FC<ArchiveProps> = ({ members, role = 'Admin', onDeleteMember }) => {
-  const [memberToDelete, setMemberToDelete] = React.useState<Member | null>(null);
+  const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [genderFilter, setGenderFilter] = useState<'All' | 'Male' | 'Female'>('All');
+
   const archivedMembers = useMemo(() => {
     return members.filter(member => isMemberArchived(member));
   }, [members]);
 
+  const filteredArchivedMembers = useMemo(() => {
+    return archivedMembers.filter(member => {
+      const term = searchTerm.toLowerCase().trim();
+      const matchesSearch = !term ||
+        member.name.toLowerCase().includes(term) ||
+        member.registrationNo.toLowerCase().includes(term) ||
+        (member.phone && member.phone.toLowerCase().includes(term)) ||
+        (member.category && member.category.toLowerCase().includes(term));
+
+      const matchesGender = genderFilter === 'All' || (member.gender || 'Male') === genderFilter;
+
+      return matchesSearch && matchesGender;
+    });
+  }, [archivedMembers, searchTerm, genderFilter]);
+
+  const maleCount = useMemo(() => archivedMembers.filter(m => (m.gender || 'Male') === 'Male').length, [archivedMembers]);
+  const femaleCount = useMemo(() => archivedMembers.filter(m => m.gender === 'Female').length, [archivedMembers]);
+
   return (
     <div className="p-4 md:p-8">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold">Archive (Inactive Records)</h1>
           <p className="text-text-secondary mt-1">Members consistently absent or inactive for more than 5 months are automatically archived.</p>
         </div>
-        <div className="bg-red-500/20 text-red-400 px-4 py-2 rounded-lg border border-red-500/30 font-bold">
-          {archivedMembers.length} Archived Members
+        <div className="bg-red-500/20 text-red-400 px-4 py-2 rounded-xl border border-red-500/30 font-bold self-start sm:self-auto font-mono text-sm">
+          {archivedMembers.length} Total Archived
+        </div>
+      </div>
+
+      {/* Filter Toolbar: Search Bar & Gender Tabs */}
+      <div className="bg-surface border border-gray-800 rounded-2xl p-3.5 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        {/* Search Input */}
+        <div className="relative flex-1 max-w-md">
+          <input
+            type="text"
+            placeholder="Search archived members by name, Reg No, or phone..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-9 py-2 bg-secondary border border-gray-700/80 rounded-xl text-sm font-medium text-text-primary placeholder-gray-500 outline-none focus:border-primary transition-all"
+          />
+          <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+              title="Clear search"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Gender Filter Tabs */}
+        <div className="flex items-center bg-secondary/80 p-1 rounded-xl border border-gray-700/80 shrink-0">
+          <button
+            type="button"
+            onClick={() => setGenderFilter('All')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              genderFilter === 'All'
+                ? 'bg-primary text-white shadow'
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            All ({archivedMembers.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setGenderFilter('Male')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+              genderFilter === 'Male'
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-text-secondary hover:text-blue-400'
+            }`}
+          >
+            <span>♂</span> Male ({maleCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setGenderFilter('Female')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+              genderFilter === 'Female'
+                ? 'bg-pink-600 text-white shadow'
+                : 'text-text-secondary hover:text-pink-400'
+            }`}
+          >
+            <span>♀</span> Female ({femaleCount})
+          </button>
         </div>
       </div>
 
@@ -49,7 +136,7 @@ const Archive: React.FC<ArchiveProps> = ({ members, role = 'Admin', onDeleteMemb
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
-              {archivedMembers.length > 0 ? archivedMembers.map(member => {
+              {filteredArchivedMembers.length > 0 ? filteredArchivedMembers.map(member => {
                 const attendanceDates = Object.entries(member.attendance)
                   .filter(([_, present]) => present)
                   .map(([date, _]) => date);
@@ -98,7 +185,23 @@ const Archive: React.FC<ArchiveProps> = ({ members, role = 'Admin', onDeleteMemb
               }) : (
                 <tr>
                   <td colSpan={6} className="p-12 text-center text-text-secondary italic">
-                    No inactive members found in the current threshold.
+                    {searchTerm || genderFilter !== 'All' ? (
+                      <div className="space-y-2 not-italic">
+                        <p className="text-gray-400">No archived members match "{searchTerm || genderFilter}".</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchTerm('');
+                            setGenderFilter('All');
+                          }}
+                          className="text-xs text-primary hover:underline font-semibold cursor-pointer"
+                        >
+                          Clear filters & search
+                        </button>
+                      </div>
+                    ) : (
+                      'No inactive members found in the current threshold.'
+                    )}
                   </td>
                 </tr>
               )}
