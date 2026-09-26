@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Member, Payment, Role } from '../types';
 import { CloseIcon, ReportIcon } from './icons';
-import { getLocalDateString, isMemberArchived, parseLocalDate } from '../lib/dateUtils';
+import { getLocalDateString, isMemberArchived, parseLocalDate, isConsistentMember } from '../lib/dateUtils';
 import { getMemberFeeDetails } from '../lib/feeUtils';
+import { ConsistentMemberStar } from './ConsistentMemberStar';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { MaskedAmount } from './MaskedAmount';
 import { 
@@ -194,7 +195,11 @@ const MemberReportModal: React.FC<{
                 <div className="pb-4 border-b border-gray-850">
                     <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-2xl font-bold text-text-primary">{member.name}</h2>
+                          <h2 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+                            <span>{member.name}</span>
+                            <ConsistentMemberStar member={member} size="md" />
+                          </h2>
+                          <ConsistentMemberStar member={member} showBadge size="xs" />
                           <GenderBadge gender={member.gender || 'Male'} size="sm" />
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${member.plan === 'Monthly' ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-pink-500/20 text-pink-400 border border-pink-500/30'}`}>
                             {member.plan} Plan
@@ -564,6 +569,8 @@ const MemberModal: React.FC<{
     onSave: (member: Partial<Member>, paymentMethod: Payment['method']) => void;
 }> = ({ member, existingMembers = [], onClose, onSave }) => {
     const [formData, setFormData] = useState<Partial<Member> & { paymentMethod?: Payment['method'] }>({});
+    const [paymentStatusMode, setPaymentStatusMode] = useState<'paid' | 'partial' | 'unpaid'>('unpaid');
+    const [paidAmountInput, setPaidAmountInput] = useState<string>('');
 
     useEffect(() => {
         const autoRegNo = getNextRegistrationNo(existingMembers);
@@ -595,6 +602,16 @@ const MemberModal: React.FC<{
                 category: 'Strength',
               };
         setFormData(initialData);
+
+        const initialMode: 'paid' | 'partial' | 'unpaid' = (member && member.id)
+            ? (member.feePaid ? 'paid' : (member.paidAmount && member.paidAmount > 0 ? 'partial' : 'unpaid'))
+            : 'unpaid';
+        setPaymentStatusMode(initialMode);
+        setPaidAmountInput(
+            initialMode === 'paid'
+                ? String(member?.fee || 2000)
+                : (member?.paidAmount && member.paidAmount > 0 ? String(member.paidAmount) : '')
+        );
     }, [member, existingMembers]);
 
     useEffect(() => {
@@ -634,13 +651,32 @@ const MemberModal: React.FC<{
                 } else if (processedValue === 'Personal Training') {
                     nextData.fee = 15000;
                 }
-                // Update dues accordingly if unpaid or partial
-                if (nextData.feePaid) {
+                
+                if (paymentStatusMode === 'paid') {
+                    setPaidAmountInput(String(nextData.fee));
                     nextData.paidAmount = nextData.fee;
                     nextData.pendingDue = 0;
-                } else {
-                    const currentPaid = Number(nextData.paidAmount) || 0;
+                } else if (paymentStatusMode === 'partial') {
+                    const currentPaid = Math.max(0, parseFloat(paidAmountInput) || 0);
+                    nextData.paidAmount = currentPaid;
                     nextData.pendingDue = Math.max(0, (nextData.fee || 0) - currentPaid);
+                } else {
+                    nextData.paidAmount = 0;
+                    nextData.pendingDue = nextData.fee || 0;
+                }
+            } else if (name === 'fee') {
+                const newFee = Math.max(0, parseFloat(value) || 0);
+                if (paymentStatusMode === 'paid') {
+                    setPaidAmountInput(String(newFee));
+                    nextData.paidAmount = newFee;
+                    nextData.pendingDue = 0;
+                } else if (paymentStatusMode === 'partial') {
+                    const currentPaid = Math.max(0, parseFloat(paidAmountInput) || 0);
+                    nextData.paidAmount = currentPaid;
+                    nextData.pendingDue = Math.max(0, newFee - currentPaid);
+                } else {
+                    nextData.paidAmount = 0;
+                    nextData.pendingDue = newFee;
                 }
             }
             return nextData;
@@ -650,14 +686,26 @@ const MemberModal: React.FC<{
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const fee = Number(formData.fee) || 0;
-        const paid = formData.feePaid ? fee : Math.max(0, Number(formData.paidAmount) || 0);
-        const isFull = paid >= fee && fee > 0;
+        let finalPaid = 0;
+        let isFull = false;
+
+        if (paymentStatusMode === 'paid') {
+            finalPaid = fee;
+            isFull = fee > 0;
+        } else if (paymentStatusMode === 'partial') {
+            finalPaid = Math.min(fee, Math.max(0, parseFloat(paidAmountInput) || 0));
+            isFull = finalPaid >= fee && fee > 0;
+        } else {
+            finalPaid = 0;
+            isFull = false;
+        }
+
         const finalData = {
             ...formData,
             fee,
             feePaid: isFull,
-            paidAmount: paid,
-            pendingDue: Math.max(0, fee - paid),
+            paidAmount: finalPaid,
+            pendingDue: Math.max(0, fee - finalPaid),
         };
         onSave(finalData as Member, formData.paymentMethod || 'Cash');
     };
@@ -665,9 +713,12 @@ const MemberModal: React.FC<{
     if (!member) return null;
 
     const currentFee = Number(formData.fee) || 0;
-    const currentPaid = formData.feePaid ? currentFee : Math.max(0, Number(formData.paidAmount) || 0);
+    const currentPaid = paymentStatusMode === 'paid'
+        ? currentFee
+        : paymentStatusMode === 'unpaid'
+            ? 0
+            : Math.min(currentFee, Math.max(0, parseFloat(paidAmountInput) || 0));
     const currentDue = Math.max(0, currentFee - currentPaid);
-    const paymentStatusMode = formData.feePaid ? 'paid' : (currentPaid > 0 ? 'partial' : 'unpaid');
 
     return (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto">
@@ -933,7 +984,9 @@ const MemberModal: React.FC<{
                                     <button
                                         type="button"
                                         onClick={() => {
+                                            setPaymentStatusMode('paid');
                                             const fee = Number(formData.fee) || 0;
+                                            setPaidAmountInput(String(fee));
                                             setFormData(prev => ({ ...prev, feePaid: true, paidAmount: fee, pendingDue: 0 }));
                                         }}
                                         className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
@@ -947,9 +1000,9 @@ const MemberModal: React.FC<{
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            const fee = Number(formData.fee) || 0;
-                                            const half = Math.round(fee / 2);
-                                            setFormData(prev => ({ ...prev, feePaid: false, paidAmount: half, pendingDue: Math.max(0, fee - half) }));
+                                            setPaymentStatusMode('partial');
+                                            setPaidAmountInput('');
+                                            setFormData(prev => ({ ...prev, feePaid: false, paidAmount: 0, pendingDue: Number(prev.fee) || 0 }));
                                         }}
                                         className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                                             paymentStatusMode === 'partial'
@@ -962,6 +1015,8 @@ const MemberModal: React.FC<{
                                     <button
                                         type="button"
                                         onClick={() => {
+                                            setPaymentStatusMode('unpaid');
+                                            setPaidAmountInput('');
                                             const fee = Number(formData.fee) || 0;
                                             setFormData(prev => ({ ...prev, feePaid: false, paidAmount: 0, pendingDue: fee }));
                                         }}
@@ -992,9 +1047,11 @@ const MemberModal: React.FC<{
                                         name="paidAmount" 
                                         min={0}
                                         max={formData.fee || 0}
-                                        value={formData.paidAmount !== undefined ? formData.paidAmount : 0} 
+                                        value={paidAmountInput} 
                                         onChange={(e) => {
-                                            const p = Math.max(0, parseFloat(e.target.value) || 0);
+                                            const val = e.target.value;
+                                            setPaidAmountInput(val);
+                                            const p = Math.max(0, parseFloat(val) || 0);
                                             const f = Number(formData.fee) || 0;
                                             setFormData(prev => ({
                                                 ...prev,
@@ -1003,7 +1060,7 @@ const MemberModal: React.FC<{
                                                 feePaid: p >= f && f > 0
                                             }));
                                         }} 
-                                        placeholder="Enter amount paid" 
+                                        placeholder="Enter amount (e.g. 600, 700)" 
                                         className="w-full pl-9 pr-3 py-2 bg-secondary border border-gray-700 text-white rounded-lg font-mono font-bold text-sm focus:outline-none focus:border-amber-500" 
                                     />
                                 </div>
@@ -1016,8 +1073,8 @@ const MemberModal: React.FC<{
                             </div>
                         )}
 
-                        {/* Payment Method Selector (When amount received > 0) */}
-                        {Boolean(formData.feePaid || (formData.paidAmount && formData.paidAmount > 0)) && (
+                        {/* Payment Method Selector */}
+                        {Boolean(paymentStatusMode === 'paid' || paymentStatusMode === 'partial') && (
                             <div className="pt-1">
                                 <label className="block text-xs font-semibold text-text-secondary mb-1">
                                     Payment Method
@@ -1135,6 +1192,7 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
     const [selectedMember, setSelectedMember] = useState<Partial<Member> | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [genderFilter, setGenderFilter] = useState<'All' | 'Male' | 'Female'>('All');
+    const [showOnlyConsistent, setShowOnlyConsistent] = useState(false);
     const [lastWarnedMemberId, setLastWarnedMemberId] = useState<string | null>(null);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
@@ -1150,6 +1208,7 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
     const femaleCount = nonArchivedMembers.filter(m => m.gender === 'Female').length;
     const todayStr = getLocalDateString();
     const activeCount = nonArchivedMembers.filter(m => new Date(m.expiryDate) >= new Date(todayStr)).length;
+    const consistentCount = useMemo(() => nonArchivedMembers.filter(m => isConsistentMember(m, todayStr)).length, [nonArchivedMembers, todayStr]);
 
     const handleAddNew = () => {
         setSelectedMember({});
@@ -1200,10 +1259,16 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
 
     const filteredMembers = useMemo(() => {
         const rawTrimmed = searchTerm.trim();
+        const meetsConsistency = (m: Member) => {
+            if (!showOnlyConsistent) return true;
+            return isConsistentMember(m, todayStr);
+        };
+
         if (!rawTrimmed) {
             return nonArchivedMembers.filter(m => {
                 const memberGender = m.gender || 'Male';
-                return genderFilter === 'All' || memberGender === genderFilter;
+                const genderOk = genderFilter === 'All' || memberGender === genderFilter;
+                return genderOk && meetsConsistency(m);
             });
         }
 
@@ -1235,7 +1300,7 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
         if (isPureNumeric) {
             const exactMatches = nonArchivedMembers.filter(m => matchesExactReg(m));
             if (exactMatches.length > 0) {
-                return exactMatches.filter(meetsGender);
+                return exactMatches.filter(m => meetsGender(m) && meetsConsistency(m));
             }
 
             if (queryDigits.length >= 10) {
@@ -1243,20 +1308,20 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
                     const cleanPhone = (m.phone || '').replace(/\D/g, '');
                     return cleanPhone === queryDigits;
                 });
-                return phoneMatches.filter(meetsGender);
+                return phoneMatches.filter(m => meetsGender(m) && meetsConsistency(m));
             }
 
             return [];
         }
 
         return nonArchivedMembers.filter(m => {
-            if (!meetsGender(m)) return false;
+            if (!meetsGender(m) || !meetsConsistency(m)) return false;
             return (
                 m.name.toLowerCase().includes(query) || 
                 m.registrationNo.toLowerCase().includes(query)
             );
         });
-    }, [nonArchivedMembers, genderFilter, searchTerm]);
+    }, [nonArchivedMembers, genderFilter, searchTerm, showOnlyConsistent, todayStr]);
 
     // Check for expired members in search results to show warning
     useEffect(() => {
@@ -1408,38 +1473,55 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
                     </svg>
                 </div>
 
-                {/* Gender Filter Tabs */}
-                <div className="flex items-center bg-secondary/80 p-1 rounded-xl border border-gray-700/80 shrink-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                    {/* Consistent Member Filter Tab */}
                     <button
-                        onClick={() => setGenderFilter('All')}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            genderFilter === 'All'
-                                ? 'bg-primary text-white shadow'
-                                : 'text-text-secondary hover:text-text-primary'
+                        type="button"
+                        onClick={() => setShowOnlyConsistent(!showOnlyConsistent)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                            showOnlyConsistent
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500 shadow-md ring-2 ring-amber-500/30'
+                                : 'bg-secondary/80 text-text-secondary border-gray-700/80 hover:text-amber-300 hover:border-amber-500/40'
                         }`}
+                        title="Filter members with 5-6+ months consistent gym attendance"
                     >
-                        All ({totalCount})
+                        <span className="text-amber-400">⭐</span>
+                        <span>Consistent ({consistentCount})</span>
                     </button>
-                    <button
-                        onClick={() => setGenderFilter('Male')}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                            genderFilter === 'Male'
-                                ? 'bg-blue-600 text-white shadow'
-                                : 'text-text-secondary hover:text-blue-400'
-                        }`}
-                    >
-                        <span>♂</span> Male ({maleCount})
-                    </button>
-                    <button
-                        onClick={() => setGenderFilter('Female')}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                            genderFilter === 'Female'
-                                ? 'bg-pink-600 text-white shadow'
-                                : 'text-text-secondary hover:text-pink-400'
-                        }`}
-                    >
-                        <span>♀</span> Female ({femaleCount})
-                    </button>
+
+                    {/* Gender Filter Tabs */}
+                    <div className="flex items-center bg-secondary/80 p-1 rounded-xl border border-gray-700/80 shrink-0">
+                        <button
+                            onClick={() => setGenderFilter('All')}
+                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                genderFilter === 'All'
+                                    ? 'bg-primary text-white shadow'
+                                    : 'text-text-secondary hover:text-text-primary'
+                            }`}
+                        >
+                            All ({totalCount})
+                        </button>
+                        <button
+                            onClick={() => setGenderFilter('Male')}
+                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                genderFilter === 'Male'
+                                    ? 'bg-blue-600 text-white shadow'
+                                    : 'text-text-secondary hover:text-blue-400'
+                            }`}
+                        >
+                            <span>♂</span> Male ({maleCount})
+                        </button>
+                        <button
+                            onClick={() => setGenderFilter('Female')}
+                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                genderFilter === 'Female'
+                                    ? 'bg-pink-600 text-white shadow'
+                                    : 'text-text-secondary hover:text-pink-400'
+                            }`}
+                        >
+                            <span>♀</span> Female ({femaleCount})
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -1470,7 +1552,10 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
                                     <td className="p-4 font-mono text-text-secondary font-semibold">{member.registrationNo}</td>
                                     <td className="p-4">
                                         <div>
-                                            <div className="font-medium text-text-primary">{member.name}</div>
+                                            <div className="font-medium text-text-primary flex items-center gap-1.5">
+                                                <span>{member.name}</span>
+                                                <ConsistentMemberStar member={member} size="sm" />
+                                            </div>
                                             <div className="text-xs text-text-secondary font-mono">{member.phone}</div>
                                         </div>
                                     </td>

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Member, Payment } from '../types';
 import { isMemberArchived } from '../lib/dateUtils';
 import { GenderBadge } from './Members';
+import { ConsistentMemberStar } from './ConsistentMemberStar';
 
 const CATEGORY_COLORS: { [key: string]: string } = {
   'Strength': 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
@@ -56,7 +57,11 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-700">
                 <div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-3xl font-bold text-text-primary">{member.name}</h2>
+                        <h2 className="text-3xl font-bold text-text-primary flex items-center gap-2">
+                            <span>{member.name}</span>
+                            <ConsistentMemberStar member={member} size="md" />
+                        </h2>
+                        <ConsistentMemberStar member={member} showBadge size="xs" />
                         <GenderBadge gender={member.gender || 'Male'} size="md" />
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${CATEGORY_COLORS[member.category || 'Strength'] || 'bg-gray-500/20 text-gray-400'}`}>
                             {member.category || 'Strength'}
@@ -278,7 +283,10 @@ const Report: React.FC<ReportProps> = ({ members, payments }) => {
                                 >
                                     <div className="flex-grow">
                                         <div className="flex items-center space-x-2">
-                                            <p className="font-semibold">{member.name}</p>
+                                            <p className="font-semibold flex items-center gap-1.5">
+                                                <span>{member.name}</span>
+                                                <ConsistentMemberStar member={member} size="sm" />
+                                            </p>
                                             <GenderBadge gender={member.gender || 'Male'} size="sm" />
                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${CATEGORY_COLORS[member.category || 'Strength'] || 'bg-gray-500/20 text-gray-400'}`}>
                                                 {member.category || 'Strength'}

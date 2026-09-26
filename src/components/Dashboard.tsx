@@ -20,6 +20,7 @@ import {
 import { getLocalDateString, getLocalMonthString, isMemberArchived } from '../lib/dateUtils';
 import { MaskedAmount } from './MaskedAmount';
 import { GenderBadge } from './Members';
+import { ConsistentMemberStar } from './ConsistentMemberStar';
 
 interface DashboardProps {
   members: Member[];
@@ -459,7 +460,10 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
                     <tr key={p.id} className="hover:bg-secondary/60 transition-colors">
                       <td className="p-3 font-semibold text-text-primary">
                         <div className="flex items-center space-x-2">
-                          <span>{p.memberName}</span>
+                          <span className="flex items-center gap-1.5">
+                            <span>{p.memberName}</span>
+                            {member && <ConsistentMemberStar member={member} size="sm" />}
+                          </span>
                           {member && <GenderBadge gender={member.gender || 'Male'} size="sm" />}
                         </div>
                       </td>

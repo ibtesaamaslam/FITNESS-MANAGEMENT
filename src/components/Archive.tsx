@@ -4,6 +4,7 @@ import { Member, Role } from '../types';
 import { TrashIcon } from './icons';
 import { isMemberArchived } from '../lib/dateUtils';
 import { GenderBadge } from './Members';
+import { ConsistentMemberStar } from './ConsistentMemberStar';
 
 interface ArchiveProps {
   members: Member[];
@@ -150,7 +151,10 @@ const Archive: React.FC<ArchiveProps> = ({ members, role = 'Admin', onDeleteMemb
                     <td className="p-4">
                        <div>
                          <div className="flex flex-wrap items-center gap-2">
-                           <span className="font-bold text-text-primary">{member.name}</span>
+                           <span className="font-bold text-text-primary flex items-center gap-1.5">
+                             <span>{member.name}</span>
+                             <ConsistentMemberStar member={member} size="sm" />
+                           </span>
                            <GenderBadge gender={member.gender || 'Male'} size="sm" />
                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${CATEGORY_COLORS[member.category || 'Strength'] || 'bg-gray-500/20 text-gray-400'}`}>
                              {member.category || 'Strength'}

@@ -5,6 +5,7 @@ import { getLocalDateString, getLocalMonthString, isMemberArchived } from '../li
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { MaskedAmount } from './MaskedAmount';
 import { GenderBadge } from './Members';
+import { ConsistentMemberStar } from './ConsistentMemberStar';
 
 const isExpiringSoon = (expiryDate: string, days: number = 7): boolean => {
     const todayStr = getLocalDateString();
@@ -605,7 +606,10 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
                         <td className="p-4 font-mono text-text-secondary">{member.registrationNo}</td>
                         <td className="p-4 font-medium">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span>{member.name}</span>
+                            <span className="flex items-center gap-1.5">
+                              <span>{member.name}</span>
+                              <ConsistentMemberStar member={member} size="sm" />
+                            </span>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${CATEGORY_COLORS[member.category || 'Strength'] || 'bg-gray-500/20 text-gray-400'}`}>
                               {member.category || 'Strength'}
                             </span>
@@ -798,7 +802,12 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
                           <td className="p-4 font-mono text-text-secondary text-xs">{payment.date}</td>
                           <td className="p-4 font-medium">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span>{payment.memberName}</span>
+                              <span className="flex items-center gap-1.5">
+                                <span>{payment.memberName}</span>
+                                {!isAccessory && memberForPayment && (
+                                  <ConsistentMemberStar member={memberForPayment} size="sm" />
+                                )}
+                              </span>
                               {!isAccessory && memberForPayment && (
                                 <GenderBadge gender={memberForPayment.gender || 'Male'} size="sm" />
                               )}

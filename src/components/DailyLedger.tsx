@@ -5,6 +5,7 @@ import { getLocalDateString } from '../lib/dateUtils';
 import { MaskedAmount } from './MaskedAmount';
 import { CashIcon, BankIcon, PhonePayIcon, SearchIcon, CloseIcon } from './icons';
 import { GenderBadge } from './Members';
+import { ConsistentMemberStar } from './ConsistentMemberStar';
 
 interface DailyLedgerProps {
   payments: Payment[];
@@ -258,7 +259,12 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
                     <tr key={p.id} className="hover:bg-gray-700/30 transition-colors">
                       <td className="p-4">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold text-text-primary">{p.memberName}</span>
+                          <span className="font-bold text-text-primary flex items-center gap-1.5">
+                            <span>{p.memberName}</span>
+                            {!isAccessory && memberForPayment && (
+                              <ConsistentMemberStar member={memberForPayment} size="sm" />
+                            )}
+                          </span>
                           {!isAccessory && memberForPayment && (
                             <GenderBadge gender={memberForPayment.gender || 'Male'} size="sm" />
                           )}

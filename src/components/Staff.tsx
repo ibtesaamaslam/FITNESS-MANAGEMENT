@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { StaffMember, StaffRole, StaffCategory, PayrollType, StaffStatus, Member, StaffShift, StaffPayrollRecord, StaffAttendanceLog, Role } from '../types';
 import { MaskedAmount } from './MaskedAmount';
-import { getLocalDateString, getLocalMonthString, parseLocalDate } from '../lib/dateUtils';
+import { getLocalDateString, getLocalMonthString, parseLocalDate, isConsistentMember } from '../lib/dateUtils';
+import { ConsistentMemberStar } from './ConsistentMemberStar';
 import { 
   UsersIcon, 
   StaffIcon, 
@@ -1224,7 +1225,7 @@ export const Staff: React.FC<StaffProps> = ({
                         {members
                           .filter(m => !selectedStaff.assignedMemberIds?.includes(m.id))
                           .map(m => (
-                            <option key={m.id} value={m.id}>{m.name} ({m.membershipType})</option>
+                            <option key={m.id} value={m.id}>{isConsistentMember(m) ? '⭐ ' : ''}{m.name} ({m.plan || 'Member'})</option>
                           ))
                         }
                       </select>
@@ -1245,7 +1246,10 @@ export const Staff: React.FC<StaffProps> = ({
                           if (!m) return null;
                           return (
                             <div key={mId} className="flex items-center justify-between bg-surface p-2 rounded-lg text-xs">
-                              <span className="font-medium text-white">{m.name}</span>
+                              <span className="font-medium text-white flex items-center gap-1.5">
+                                <span>{m.name}</span>
+                                <ConsistentMemberStar member={m} size="xs" />
+                              </span>
                               <button
                                 onClick={() => onUnassignMember(selectedStaff.id, mId)}
                                 className="text-red-400 hover:text-red-300 text-[11px] font-semibold"

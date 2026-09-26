@@ -8,6 +8,7 @@ import { getMemberFeeDetails } from '../lib/feeUtils';
 import { GenderBadge } from './Members';
 import { CloseIcon, LockIcon } from './icons';
 import { MaskedAmount } from './MaskedAmount';
+import { ConsistentMemberStar } from './ConsistentMemberStar';
 import { Pencil } from 'lucide-react';
 
 interface AttendanceProps {
@@ -427,7 +428,10 @@ const Attendance: React.FC<AttendanceProps> = ({
                   <td className="p-4 font-medium">
                     <div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className={`font-semibold ${isExpired ? 'text-red-400 font-bold' : 'text-text-primary'}`}>{member.name}</span>
+                            <span className={`font-semibold flex items-center gap-1.5 ${isExpired ? 'text-red-400 font-bold' : 'text-text-primary'}`}>
+                                <span>{member.name}</span>
+                                <ConsistentMemberStar member={member} size="sm" />
+                            </span>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${CATEGORY_COLORS[member.category || 'Strength'] || 'bg-gray-500/20 text-gray-400'}`}>
                                 {member.category || 'Strength'}
                             </span>
@@ -563,7 +567,7 @@ const QuickDuesModal: React.FC<QuickDuesModalProps> = ({ member, onClose, onSave
       ? String(feeDetails.fee) 
       : feeDetails.isPartial 
         ? String(feeDetails.paidAmount) 
-        : String(Math.round(feeDetails.fee / 2))
+        : ''
   );
   const [paymentMethod, setPaymentMethod] = useState<Payment['method']>('Cash');
 
@@ -601,6 +605,7 @@ const QuickDuesModal: React.FC<QuickDuesModalProps> = ({ member, onClose, onSave
           <div>
             <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
               <span>{member.name}</span>
+              <ConsistentMemberStar member={member} size="sm" />
               <span className="text-xs font-mono px-2 py-0.5 rounded bg-secondary text-text-secondary">
                 #{member.registrationNo}
               </span>
@@ -648,7 +653,10 @@ const QuickDuesModal: React.FC<QuickDuesModalProps> = ({ member, onClose, onSave
               </button>
               <button
                 type="button"
-                onClick={() => setPaymentMode('partial')}
+                onClick={() => {
+                  setPaymentMode('partial');
+                  setPaidAmountInput('');
+                }}
                 className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                   paymentMode === 'partial'
                     ? 'bg-amber-600 text-white border-amber-500 shadow-md ring-2 ring-amber-500/30'
@@ -688,8 +696,7 @@ const QuickDuesModal: React.FC<QuickDuesModalProps> = ({ member, onClose, onSave
                   value={paidAmountInput}
                   onChange={(e) => setPaidAmountInput(e.target.value)}
                   className="w-full pl-10 pr-3 py-2.5 bg-secondary border border-gray-700 rounded-lg text-white font-mono font-bold text-base focus:border-amber-500 focus:outline-none"
-                  placeholder="e.g. 1000"
-                  required
+                  placeholder="Enter amount (e.g. 600, 700)"
                 />
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-mono text-xs">
                   Rs
@@ -705,7 +712,7 @@ const QuickDuesModal: React.FC<QuickDuesModalProps> = ({ member, onClose, onSave
           )}
 
           {/* Payment Method */}
-          {parsedPaid > 0 && (
+          {(paymentMode === 'full' || paymentMode === 'partial') && (
             <div>
               <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1.5">
                 Payment Method

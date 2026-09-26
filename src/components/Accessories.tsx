@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { AccessoryItem, AccessorySale, Member, Payment, Role } from '../types';
 import { MaskedAmount } from './MaskedAmount';
 import { CashIcon, BankIcon, PhonePayIcon, AccessoriesIcon, TrashIcon, CloseIcon } from './icons';
-import { getLocalDateString } from '../lib/dateUtils';
+import { getLocalDateString, isConsistentMember } from '../lib/dateUtils';
 
 interface AccessoriesProps {
   accessories: AccessoryItem[];
@@ -815,7 +815,7 @@ export const Accessories: React.FC<AccessoriesProps> = ({
                 >
                   <option value="">-- Select Registered Member (Optional) --</option>
                   {members.map(m => (
-                    <option key={m.id} value={m.id}>{m.name} (#{m.registrationNo})</option>
+                    <option key={m.id} value={m.id}>{isConsistentMember(m) ? '⭐ ' : ''}{m.name} (#{m.registrationNo})</option>
                   ))}
                 </select>
 

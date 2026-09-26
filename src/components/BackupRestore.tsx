@@ -13,6 +13,7 @@ import {
   MonthlyHistoricalSnapshot,
   Role
 } from '../types';
+import { ConsistentMemberStar } from './ConsistentMemberStar';
 import { BackupIcon, DownloadIcon, UploadCloudIcon, RefreshIcon, CloseIcon, LockIcon } from './icons';
 import { isMemberArchived, getLocalDateString } from '../lib/dateUtils';
 
@@ -1064,10 +1065,15 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-800/60 bg-surface">
-                      {recentTransactions.map((p) => (
+                      {recentTransactions.map((p) => {
+                        const mem = members.find(m => m.id === p.memberId || m.name === p.memberName);
+                        return (
                         <tr key={p.id} className="hover:bg-secondary/30 transition-colors">
                           <td className="py-2.5 px-3">
-                            <span className="font-bold text-text-primary block">{p.memberName}</span>
+                            <span className="font-bold text-text-primary flex items-center gap-1.5">
+                              <span>{p.memberName}</span>
+                              {mem && <ConsistentMemberStar member={mem} size="xs" />}
+                            </span>
                             <span className="text-[10px] text-text-secondary font-mono">Reg: {p.memberRegNo || 'N/A'}</span>
                           </td>
                           <td className="py-2.5 px-3 text-text-secondary font-mono">
@@ -1086,7 +1092,8 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                             Rs. {p.amount.toLocaleString()}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1586,10 +1593,15 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {inspectingMonth.paymentsList.map((p) => (
+                    {inspectingMonth.paymentsList.map((p) => {
+                      const mem = members.find(m => m.id === p.memberId || m.name === p.memberName);
+                      return (
                       <div key={p.id} className="p-3 rounded-xl bg-secondary/40 border border-gray-800 flex items-center justify-between text-xs">
                         <div>
-                          <span className="font-bold text-text-primary block">{p.memberName}</span>
+                          <span className="font-bold text-text-primary flex items-center gap-1.5">
+                            <span>{p.memberName}</span>
+                            {mem && <ConsistentMemberStar member={mem} size="xs" />}
+                          </span>
                           <span className="text-[10px] text-text-secondary font-mono">
                             Reg: {p.memberRegNo || 'N/A'} · Date: {p.date} · Method: {p.method}
                           </span>
@@ -1598,7 +1610,8 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                           Rs. {p.amount.toLocaleString()}
                         </span>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )
               )}
