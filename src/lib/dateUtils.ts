@@ -177,3 +177,51 @@ export const getMemberConsistencyDetails = (
       : undefined
   };
 };
+
+/**
+ * Parses a standard 12-hour or 24-hour time string into total minutes from midnight.
+ * e.g. "06:30:15 PM" -> 18 * 60 + 30 = 1110
+ */
+export const parseTimeStringToMinutes = (timeStr?: string): number | null => {
+  if (!timeStr || timeStr === '—') return null;
+  try {
+    const isPM = timeStr.toUpperCase().includes('PM');
+    const isAM = timeStr.toUpperCase().includes('AM');
+    const clean = timeStr.replace(/[^\d:]/g, '');
+    const parts = clean.split(':').map(Number);
+    if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return null;
+    let hours = parts[0];
+    const minutes = parts[1];
+    if (isPM && hours < 12) hours += 12;
+    if (isAM && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Calculates duration between check-in and check-out strings.
+ * Returns human-readable duration e.g. "1h 35m", "45m", or "Inside"
+ */
+export const calculateStayDuration = (checkIn?: string, checkOut?: string): string => {
+  if (!checkIn || checkIn === '—') return '—';
+  if (!checkOut || checkOut === '—') return 'In Session';
+
+  const inMins = parseTimeStringToMinutes(checkIn);
+  const outMins = parseTimeStringToMinutes(checkOut);
+  if (inMins === null || outMins === null) return '—';
+
+  let diff = outMins - inMins;
+  if (diff < 0) {
+    // Wrapped around midnight (e.g. 11 PM to 1 AM)
+    diff += 24 * 60;
+  }
+  if (diff === 0) return '< 1 min';
+  const hrs = Math.floor(diff / 60);
+  const mins = diff % 60;
+  if (hrs > 0 && mins > 0) return `${hrs}h ${mins}m`;
+  if (hrs > 0) return `${hrs}h`;
+  return `${mins}m`;
+};
+

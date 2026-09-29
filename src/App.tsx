@@ -103,7 +103,9 @@ const App: React.FC = () => {
         deleteAccessoryItem,
         sellAccessoryItem,
         deleteAccessorySale,
-        updateAttendance, 
+        updateAttendance,
+        updateCheckOut,
+        checkOutAllActiveMembers,
         toggleReminder,
         addStaffMember,
         updateStaffMember,
@@ -184,10 +186,19 @@ const App: React.FC = () => {
         showToast('Payment record deleted successfully', 'info');
     }, [deletePayment, role, showToast]);
 
-    const handleUpdateAttendance = useCallback((memberId: string, date: string, present: boolean) => {
-        updateAttendance(memberId, date, present);
-        // Optional: show toast for attendance? Might be too spammy.
+    const handleUpdateAttendance = useCallback((memberId: string, date: string, present: boolean, customTime?: string, customCheckOutTime?: string) => {
+        updateAttendance(memberId, date, present, customTime, customCheckOutTime);
     }, [updateAttendance]);
+
+    const handleUpdateCheckOut = useCallback((memberId: string, date: string, checkOutTime?: string) => {
+        updateCheckOut(memberId, date, checkOutTime);
+        showToast('Check-out timestamp updated', 'info');
+    }, [updateCheckOut, showToast]);
+
+    const handleCheckOutAllActiveMembers = useCallback((date: string) => {
+        checkOutAllActiveMembers(date);
+        showToast('All active members checked out successfully!', 'success');
+    }, [checkOutAllActiveMembers, showToast]);
     
     const handleToggleReminders = useCallback((memberId: string, enabled: boolean) => {
         toggleReminder(memberId, enabled);
@@ -247,7 +258,19 @@ const App: React.FC = () => {
             case 'fees':
                 return <Fees members={members} payments={payments} accessorySales={accessorySales} role={role} onToggleReminders={handleToggleReminders} onDeletePayment={handleDeletePayment} isUnlocked={isUnlocked} onUnlockRequest={openUnlockModal} />;
             case 'attendance':
-                return <Attendance members={members} role={role} onUpdateAttendance={handleUpdateAttendance} onWarning={(msg) => showToast(msg, 'error')} onUpdateMember={handleUpdateMember} isUnlocked={isUnlocked} onUnlockRequest={openUnlockModal} />;
+                return (
+                    <Attendance
+                        members={members}
+                        role={role}
+                        onUpdateAttendance={handleUpdateAttendance}
+                        onUpdateCheckOut={handleUpdateCheckOut}
+                        onCheckOutAllActive={handleCheckOutAllActiveMembers}
+                        onWarning={(msg) => showToast(msg, 'error')}
+                        onUpdateMember={handleUpdateMember}
+                        isUnlocked={isUnlocked}
+                        onUnlockRequest={openUnlockModal}
+                    />
+                );
             case 'report':
                 return <Report members={members} payments={payments} />;
             case 'dailyledger':

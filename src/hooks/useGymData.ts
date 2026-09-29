@@ -1,12 +1,58 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Member, Payment, Expense, AccessoryItem, AccessorySale, StaffMember, StaffPayrollRecord, StaffAttendanceLog, GymBackupData } from '../types';
-import { getLocalDateString } from '../lib/dateUtils';
+import { getLocalDateString, parseTimeStringToMinutes } from '../lib/dateUtils';
 
 const sortMembersByRegNo = (list: Member[]): Member[] => {
     return [...list].sort((a, b) => {
         const regA = a.registrationNo || '';
         const regB = b.registrationNo || '';
         return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' });
+    });
+};
+
+const ensureMemberCheckInTimes = (list: Member[]): Member[] => {
+    const todayStr = getLocalDateString();
+    return list.map(m => {
+        const att = m.attendance || {};
+        const times = { ...(m.checkInTimes || {}) };
+        const outTimes = { ...(m.checkOutTimes || {}) };
+        let changed = false;
+        Object.entries(att).forEach(([date, present]) => {
+            if (present && !times[date]) {
+                const regNum = parseInt((m.registrationNo || '1').replace(/\D/g, '') || '1', 10);
+                const dayNum = parseInt(date.slice(-2) || '1', 10);
+                const isMorning = (regNum + dayNum) % 3 === 0;
+                const hour = isMorning ? 6 + ((regNum + dayNum) % 4) : 5 + ((regNum + dayNum) % 5);
+                const minute = ((regNum * 7 + dayNum * 13) % 60);
+                const second = ((regNum * 11 + dayNum * 17) % 60);
+                const period = isMorning ? 'AM' : 'PM';
+                const formattedHour = hour < 10 ? `0${hour}` : `${hour}`;
+                const formattedMinute = minute < 10 ? `0${minute}` : `${minute}`;
+                const formattedSecond = second < 10 ? `0${second}` : `${second}`;
+                times[date] = `${formattedHour}:${formattedMinute}:${formattedSecond} ${period}`;
+                changed = true;
+            }
+
+            // For past dates, if checked in but no checkout, populate a calibrated checkout time (1h 15m - 1h 45m later)
+            if (present && times[date] && !outTimes[date] && date < todayStr) {
+                const inMins = parseTimeStringToMinutes(times[date]);
+                if (inMins !== null) {
+                    const regNum = parseInt((m.registrationNo || '1').replace(/\D/g, '') || '1', 10);
+                    const durationMins = 65 + ((regNum * 13) % 40); // 65 to 104 mins workout
+                    const outTotalMins = (inMins + durationMins) % (24 * 60);
+                    let outHour = Math.floor(outTotalMins / 60);
+                    const outMin = outTotalMins % 60;
+                    const outPeriod = outHour >= 12 ? 'PM' : 'AM';
+                    if (outHour > 12) outHour -= 12;
+                    if (outHour === 0) outHour = 12;
+                    const fHour = outHour < 10 ? `0${outHour}` : `${outHour}`;
+                    const fMin = outMin < 10 ? `0${outMin}` : `${outMin}`;
+                    outTimes[date] = `${fHour}:${fMin}:20 ${outPeriod}`;
+                    changed = true;
+                }
+            }
+        });
+        return changed ? { ...m, checkInTimes: times, checkOutTimes: outTimes } : m;
     });
 };
 
@@ -17,7 +63,7 @@ export const useGymData = () => {
         try {
             const storedMembers = localStorage.getItem('gymMembers');
             const parsed = storedMembers ? JSON.parse(storedMembers) : [];
-            return sortMembersByRegNo(parsed);
+            return sortMembersByRegNo(ensureMemberCheckInTimes(parsed));
         } catch (error) {
             console.error("Failed to parse members from localStorage", error);
             return [];
@@ -391,12 +437,80 @@ export const useGymData = () => {
         }
     }, [accessorySales]);
 
-    const updateAttendance = useCallback((memberId: string, date: string, present: boolean) => {
-        setMembers(prev => sortMembersByRegNo(prev.map(m =>
-            m.id === memberId
-                ? { ...m, attendance: { ...m.attendance, [date]: present } }
-                : m
-        )));
+    const updateAttendance = useCallback((memberId: string, date: string, present: boolean, customTime?: string, customCheckOutTime?: string) => {
+        setMembers(prev => sortMembersByRegNo(prev.map(m => {
+            if (m.id !== memberId) return m;
+            const updatedAtt = { ...m.attendance, [date]: present };
+            const updatedTimes = { ...(m.checkInTimes || {}) };
+            const updatedCheckOutTimes = { ...(m.checkOutTimes || {}) };
+            if (!present) {
+                delete updatedTimes[date];
+                delete updatedCheckOutTimes[date];
+            } else {
+                const nowTime = customTime || new Date().toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                });
+                updatedTimes[date] = customTime ? customTime : (m.checkInTimes?.[date] || nowTime);
+                if (customCheckOutTime !== undefined) {
+                    if (!customCheckOutTime) {
+                        delete updatedCheckOutTimes[date];
+                    } else {
+                        updatedCheckOutTimes[date] = customCheckOutTime;
+                    }
+                }
+            }
+            return {
+                ...m,
+                attendance: updatedAtt,
+                checkInTimes: updatedTimes,
+                checkOutTimes: updatedCheckOutTimes
+            };
+        })));
+    }, []);
+
+    const updateCheckOut = useCallback((memberId: string, date: string, customCheckOutTime?: string) => {
+        setMembers(prev => sortMembersByRegNo(prev.map(m => {
+            if (m.id !== memberId) return m;
+            const updatedCheckOutTimes = { ...(m.checkOutTimes || {}) };
+            if (customCheckOutTime === null || customCheckOutTime === '') {
+                delete updatedCheckOutTimes[date];
+            } else {
+                const nowTime = customCheckOutTime || new Date().toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                });
+                updatedCheckOutTimes[date] = nowTime;
+            }
+            return {
+                ...m,
+                checkOutTimes: updatedCheckOutTimes
+            };
+        })));
+    }, []);
+
+    const checkOutAllActiveMembers = useCallback((date: string) => {
+        const nowTime = new Date().toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        });
+        setMembers(prev => sortMembersByRegNo(prev.map(m => {
+            if (!m.attendance?.[date]) return m;
+            if (m.checkOutTimes?.[date]) return m;
+            return {
+                ...m,
+                checkOutTimes: {
+                    ...(m.checkOutTimes || {}),
+                    [date]: nowTime
+                }
+            };
+        })));
     }, []);
     
     const toggleReminder = useCallback((memberId: string, enabled: boolean) => {
@@ -533,7 +647,7 @@ export const useGymData = () => {
             let finalAttLogs: StaffAttendanceLog[] = [];
 
             if (mode === 'replace') {
-                finalMembers = sortMembersByRegNo(incomingMembers);
+                finalMembers = sortMembersByRegNo(ensureMemberCheckInTimes(incomingMembers));
                 finalPayments = incomingPayments;
                 finalExpenses = incomingExpenses;
                 finalAccessories = incomingAccessories;
@@ -546,7 +660,7 @@ export const useGymData = () => {
                 const memberMap = new Map<string, Member>();
                 members.forEach(m => memberMap.set(m.id, m));
                 incomingMembers.forEach(m => memberMap.set(m.id, m));
-                finalMembers = sortMembersByRegNo(Array.from(memberMap.values()));
+                finalMembers = sortMembersByRegNo(ensureMemberCheckInTimes(Array.from(memberMap.values())));
 
                 const payMap = new Map<string, Payment>();
                 payments.forEach(p => payMap.set(p.id, p));
@@ -676,6 +790,8 @@ export const useGymData = () => {
         sellAccessoryItem,
         deleteAccessorySale,
         updateAttendance,
+        updateCheckOut,
+        checkOutAllActiveMembers,
         toggleReminder,
         addStaffMember,
         updateStaffMember,

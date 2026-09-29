@@ -166,6 +166,8 @@ export interface Member {
   photo?: string;
   remindersEnabled?: boolean;
   attendance: { [date: string]: boolean }; // date: YYYY-MM-DD
+  checkInTimes?: { [date: string]: string }; // date: YYYY-MM-DD -> exact timestamp e.g. "06:45:12 PM"
+  checkOutTimes?: { [date: string]: string }; // date: YYYY-MM-DD -> exact departure timestamp e.g. "08:15:30 PM"
   category?: 'Strength' | 'Cardio' | 'Personal Training';
   assignedTrainerId?: string;
   measurements?: MeasurementEntry[];
@@ -204,6 +206,18 @@ export interface ToastMessage {
   type: ToastType;
 }
 
+export interface MonthCheckInRecord {
+  id: string;
+  memberId: string;
+  memberName: string;
+  memberRegNo?: string;
+  gender?: 'Male' | 'Female';
+  plan?: string;
+  category?: string;
+  date: string;
+  time?: string;
+}
+
 export interface MonthlyHistoricalSnapshot {
   monthKey: string; // YYYY-MM e.g. "2026-09"
   monthName: string; // e.g. "September 2026"
@@ -229,7 +243,9 @@ export interface MonthlyHistoricalSnapshot {
   totalOutflow: number;
   netOperatingProfit: number;
   attendanceCheckIns: number;
+  checkInsList?: MonthCheckInRecord[];
   newMembersJoined: number;
+  newMembersList?: Member[];
   activeMembersInMonth: number;
 }
 

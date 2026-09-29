@@ -11,9 +11,11 @@ import {
   GymBackupData,
   BackupReportSummary,
   MonthlyHistoricalSnapshot,
+  MonthCheckInRecord,
   Role
 } from '../types';
 import { ConsistentMemberStar } from './ConsistentMemberStar';
+import { GenderBadge } from './Members';
 import { BackupIcon, DownloadIcon, UploadCloudIcon, RefreshIcon, CloseIcon, LockIcon } from './icons';
 import { isMemberArchived, getLocalDateString } from '../lib/dateUtils';
 
@@ -57,7 +59,8 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
   const [restoreSuccessModal, setRestoreSuccessModal] = useState<{ open: boolean; stats?: any } | null>(null);
   const [inspectingMonth, setInspectingMonth] = useState<MonthlyHistoricalSnapshot | null>(null);
-  const [monthDetailTab, setMonthDetailTab] = useState<'payments' | 'expenses' | 'payrolls'>('payments');
+  const [monthDetailTab, setMonthDetailTab] = useState<'payments' | 'expenses' | 'payrolls' | 'checkins' | 'newJoined'>('payments');
+  const [modalSearchQuery, setModalSearchQuery] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -183,19 +186,32 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
       const salesProfit = monthSales.reduce((sum, s) => sum + (s.totalProfit || 0), 0);
 
       // 5. Attendance check-ins in this month
-      let monthCheckIns = 0;
+      const monthCheckInsList: MonthCheckInRecord[] = [];
       members.forEach(m => {
         if (m.attendance) {
           Object.keys(m.attendance).forEach(dateStr => {
             if (dateStr.startsWith(monthKey) && m.attendance[dateStr]) {
-              monthCheckIns++;
+              monthCheckInsList.push({
+                id: `${m.id}-${dateStr}`,
+                memberId: m.id,
+                memberName: m.name,
+                memberRegNo: m.registrationNo,
+                gender: (m.gender || 'Male') as 'Male' | 'Female',
+                plan: m.plan,
+                category: m.category,
+                date: dateStr,
+                time: m.checkInTimes?.[dateStr],
+              });
             }
           });
         }
       });
+      monthCheckInsList.sort((a, b) => b.date.localeCompare(a.date));
 
       // 6. New Members joined in this month
-      const newMembers = members.filter(m => m.joinDate && m.joinDate.startsWith(monthKey)).length;
+      const monthNewMembersList = members
+        .filter(m => m.joinDate && m.joinDate.startsWith(monthKey))
+        .sort((a, b) => (b.joinDate || '').localeCompare(a.joinDate || ''));
 
       // 7. Active members active in this month window
       const monthStart = new Date(year, monthIndex, 1);
@@ -236,8 +252,10 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
         totalInflow,
         totalOutflow,
         netOperatingProfit,
-        attendanceCheckIns: monthCheckIns,
-        newMembersJoined: newMembers,
+        attendanceCheckIns: monthCheckInsList.length,
+        checkInsList: monthCheckInsList,
+        newMembersJoined: monthNewMembersList.length,
+        newMembersList: monthNewMembersList,
         activeMembersInMonth: activeInMonth,
       });
     }
@@ -250,6 +268,88 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
   const past12MonthsTotalExpenses = past12MonthsArchive.reduce((acc, m) => acc + m.totalOutflow, 0);
   const past12MonthsTotalNet = past12MonthsTotalRevenue - past12MonthsTotalExpenses;
   const past12MonthsTotalTransactions = past12MonthsArchive.reduce((acc, m) => acc + m.transactionsCount, 0);
+
+  // Fallback memos for inspectingMonth records (in case loaded snapshot has no checkInsList/newMembersList)
+  const inspectingCheckIns = useMemo(() => {
+    if (!inspectingMonth) return [];
+    if (inspectingMonth.checkInsList && inspectingMonth.checkInsList.length > 0) {
+      return inspectingMonth.checkInsList;
+    }
+    const list: MonthCheckInRecord[] = [];
+    members.forEach(m => {
+      if (m.attendance) {
+        Object.keys(m.attendance).forEach(dateStr => {
+          if (dateStr.startsWith(inspectingMonth.monthKey) && m.attendance[dateStr]) {
+            list.push({
+              id: `${m.id}-${dateStr}`,
+              memberId: m.id,
+              memberName: m.name,
+              memberRegNo: m.registrationNo,
+              gender: (m.gender || 'Male') as 'Male' | 'Female',
+              plan: m.plan,
+              category: m.category,
+              date: dateStr,
+              time: m.checkInTimes?.[dateStr],
+            });
+          }
+        });
+      }
+    });
+    return list.sort((a, b) => b.date.localeCompare(a.date));
+  }, [inspectingMonth, members]);
+
+  const inspectingNewMembers = useMemo(() => {
+    if (!inspectingMonth) return [];
+    if (inspectingMonth.newMembersList && inspectingMonth.newMembersList.length > 0) {
+      return inspectingMonth.newMembersList;
+    }
+    return members
+      .filter(m => m.joinDate && m.joinDate.startsWith(inspectingMonth.monthKey))
+      .sort((a, b) => (b.joinDate || '').localeCompare(a.joinDate || ''));
+  }, [inspectingMonth, members]);
+
+  const filteredPayments = useMemo(() => {
+    if (!inspectingMonth) return [];
+    if (!modalSearchQuery.trim()) return inspectingMonth.paymentsList;
+    const q = modalSearchQuery.toLowerCase();
+    return inspectingMonth.paymentsList.filter(
+      p => p.memberName.toLowerCase().includes(q) || (p.memberRegNo && p.memberRegNo.toLowerCase().includes(q)) || p.date.includes(q)
+    );
+  }, [inspectingMonth, modalSearchQuery]);
+
+  const filteredExpenses = useMemo(() => {
+    if (!inspectingMonth) return [];
+    if (!modalSearchQuery.trim()) return inspectingMonth.expensesList;
+    const q = modalSearchQuery.toLowerCase();
+    return inspectingMonth.expensesList.filter(
+      e => e.title.toLowerCase().includes(q) || e.category.toLowerCase().includes(q) || e.date.includes(q)
+    );
+  }, [inspectingMonth, modalSearchQuery]);
+
+  const filteredPayrolls = useMemo(() => {
+    if (!inspectingMonth) return [];
+    if (!modalSearchQuery.trim()) return inspectingMonth.payrollList;
+    const q = modalSearchQuery.toLowerCase();
+    return inspectingMonth.payrollList.filter(
+      pr => pr.staffName.toLowerCase().includes(q) || pr.status.toLowerCase().includes(q)
+    );
+  }, [inspectingMonth, modalSearchQuery]);
+
+  const filteredCheckIns = useMemo(() => {
+    if (!modalSearchQuery.trim()) return inspectingCheckIns;
+    const q = modalSearchQuery.toLowerCase();
+    return inspectingCheckIns.filter(
+      ci => ci.memberName.toLowerCase().includes(q) || (ci.memberRegNo && ci.memberRegNo.toLowerCase().includes(q)) || ci.date.includes(q)
+    );
+  }, [inspectingCheckIns, modalSearchQuery]);
+
+  const filteredNewMembers = useMemo(() => {
+    if (!modalSearchQuery.trim()) return inspectingNewMembers;
+    const q = modalSearchQuery.toLowerCase();
+    return inspectingNewMembers.filter(
+      m => m.name.toLowerCase().includes(q) || (m.registrationNo && m.registrationNo.toLowerCase().includes(q)) || (m.phone && m.phone.includes(q)) || (m.joinDate && m.joinDate.includes(q))
+    );
+  }, [inspectingNewMembers, modalSearchQuery]);
 
   // Compile entire system data into one unified backup package with full report & 12-month archive
   const generateBackupPackage = (): GymBackupData => {
@@ -1488,7 +1588,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
       {/* MODAL: Inspecting Month Details (Itemized Records for Past 12 Months) */}
       {inspectingMonth && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-surface border border-gray-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+          <div className="bg-surface border border-gray-700 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-gray-800">
               <div>
                 <h3 className="text-lg font-black text-text-primary flex items-center gap-2">
@@ -1496,20 +1596,31 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                   <span>{inspectingMonth.monthName} Detailed Records</span>
                 </h3>
                 <p className="text-xs text-text-secondary mt-0.5">
-                  Complete itemized transaction, expense, and payroll breakdown for this month
+                  Complete itemized transactions, expenses, payroll, check-ins, and new members breakdown for this month
                 </p>
               </div>
               <button
-                onClick={() => setInspectingMonth(null)}
+                onClick={() => {
+                  setInspectingMonth(null);
+                  setModalSearchQuery('');
+                }}
                 className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-secondary cursor-pointer"
               >
                 <CloseIcon className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Quick Month Metrics Summary */}
+            {/* Quick Month Metrics Summary Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
-              <div className="bg-secondary/60 p-2.5 rounded-xl border border-gray-800">
+              <div 
+                onClick={() => setMonthDetailTab('payments')}
+                className={`p-2.5 rounded-xl border cursor-pointer transition-all ${
+                  monthDetailTab === 'payments' 
+                    ? 'bg-emerald-500/15 border-emerald-500/40 ring-1 ring-emerald-500/30' 
+                    : 'bg-secondary/60 border-gray-800 hover:border-gray-700'
+                }`}
+                title="Click to view payments"
+              >
                 <span className="text-[10px] text-text-secondary block">Collections</span>
                 <span className="text-sm font-bold text-emerald-400 mt-0.5 block">
                   Rs. {inspectingMonth.feeCollections.toLocaleString()}
@@ -1518,7 +1629,15 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                   {inspectingMonth.paymentsList.length} payments
                 </span>
               </div>
-              <div className="bg-secondary/60 p-2.5 rounded-xl border border-gray-800">
+              <div 
+                onClick={() => setMonthDetailTab('expenses')}
+                className={`p-2.5 rounded-xl border cursor-pointer transition-all ${
+                  monthDetailTab === 'expenses' 
+                    ? 'bg-red-500/15 border-red-500/40 ring-1 ring-red-500/30' 
+                    : 'bg-secondary/60 border-gray-800 hover:border-gray-700'
+                }`}
+                title="Click to view expenses"
+              >
                 <span className="text-[10px] text-text-secondary block">Expenses</span>
                 <span className="text-sm font-bold text-red-400 mt-0.5 block">
                   Rs. {inspectingMonth.expensesAmount.toLocaleString()}
@@ -1527,7 +1646,15 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                   {inspectingMonth.expensesList.length} expenses
                 </span>
               </div>
-              <div className="bg-secondary/60 p-2.5 rounded-xl border border-gray-800">
+              <div 
+                onClick={() => setMonthDetailTab('payrolls')}
+                className={`p-2.5 rounded-xl border cursor-pointer transition-all ${
+                  monthDetailTab === 'payrolls' 
+                    ? 'bg-blue-500/15 border-blue-500/40 ring-1 ring-blue-500/30' 
+                    : 'bg-secondary/60 border-gray-800 hover:border-gray-700'
+                }`}
+                title="Click to view staff payroll"
+              >
                 <span className="text-[10px] text-text-secondary block">Payroll</span>
                 <span className="text-sm font-bold text-blue-400 mt-0.5 block">
                   Rs. {inspectingMonth.payrollDisbursed.toLocaleString()}
@@ -1536,25 +1663,39 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                   {inspectingMonth.payrollList.length} slips
                 </span>
               </div>
-              <div className="bg-secondary/60 p-2.5 rounded-xl border border-gray-800">
+              <div 
+                onClick={() => setMonthDetailTab('checkins')}
+                className={`p-2.5 rounded-xl border cursor-pointer transition-all ${
+                  monthDetailTab === 'checkins' || monthDetailTab === 'newJoined'
+                    ? 'bg-amber-500/15 border-amber-500/40 ring-1 ring-amber-500/30' 
+                    : 'bg-secondary/60 border-gray-800 hover:border-gray-700'
+                }`}
+                title="Click to view check-ins & joined members"
+              >
                 <span className="text-[10px] text-text-secondary block">Check-ins</span>
                 <span className="text-sm font-bold text-amber-400 mt-0.5 block">
-                  {inspectingMonth.attendanceCheckIns} logs
+                  {inspectingCheckIns.length} logs
                 </span>
-                <span className="text-[9px] text-text-secondary block">
-                  {inspectingMonth.newMembersJoined} joined
+                <span 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMonthDetailTab('newJoined');
+                  }}
+                  className="text-[9px] text-emerald-400 font-semibold block hover:underline"
+                >
+                  {inspectingNewMembers.length} joined
                 </span>
               </div>
             </div>
 
-            {/* Sub-Tabs: Payments vs Expenses vs Payroll */}
-            <div className="flex items-center gap-2 border-b border-gray-800 pb-2">
+            {/* Sub-Tabs: 5 Buttons - Payments vs Expenses vs Payroll vs Check-ins vs New Joined */}
+            <div className="flex flex-wrap items-center gap-2 border-b border-gray-800 pb-2">
               <button
                 type="button"
                 onClick={() => setMonthDetailTab('payments')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   monthDetailTab === 'payments'
-                    ? 'bg-[#10b981] text-white'
+                    ? 'bg-[#10b981] text-white shadow-md'
                     : 'bg-secondary text-text-secondary hover:text-text-primary'
                 }`}
               >
@@ -1565,7 +1706,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                 onClick={() => setMonthDetailTab('expenses')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   monthDetailTab === 'expenses'
-                    ? 'bg-[#10b981] text-white'
+                    ? 'bg-[#10b981] text-white shadow-md'
                     : 'bg-secondary text-text-secondary hover:text-text-primary'
                 }`}
               >
@@ -1576,27 +1717,77 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                 onClick={() => setMonthDetailTab('payrolls')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   monthDetailTab === 'payrolls'
-                    ? 'bg-[#10b981] text-white'
+                    ? 'bg-[#10b981] text-white shadow-md'
                     : 'bg-secondary text-text-secondary hover:text-text-primary'
                 }`}
               >
                 👥 Staff Payroll ({inspectingMonth.payrollList.length})
               </button>
+              <button
+                type="button"
+                onClick={() => setMonthDetailTab('checkins')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  monthDetailTab === 'checkins'
+                    ? 'bg-[#10b981] text-white shadow-md'
+                    : 'bg-secondary text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                📋 Check-ins ({inspectingCheckIns.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setMonthDetailTab('newJoined')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  monthDetailTab === 'newJoined'
+                    ? 'bg-[#10b981] text-white shadow-md'
+                    : 'bg-secondary text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                ✨ New Joined ({inspectingNewMembers.length})
+              </button>
+            </div>
+
+            {/* In-Modal Search filter */}
+            <div className="relative">
+              <input
+                type="text"
+                value={modalSearchQuery}
+                onChange={(e) => setModalSearchQuery(e.target.value)}
+                placeholder={`Search records in ${
+                  monthDetailTab === 'payments' ? 'payments' :
+                  monthDetailTab === 'expenses' ? 'expenses' :
+                  monthDetailTab === 'payrolls' ? 'payroll slips' :
+                  monthDetailTab === 'checkins' ? 'check-in logs' : 'new joined members'
+                } (name, reg#, date)...`}
+                className="w-full px-3 py-2 bg-secondary/80 border border-gray-800 focus:border-primary rounded-xl text-xs text-text-primary placeholder:text-gray-500 focus:outline-none transition-colors"
+              />
+              {modalSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setModalSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs font-bold"
+                >
+                  ✕
+                </button>
+              )}
             </div>
 
             {/* Itemized List container */}
-            <div className="flex-1 overflow-y-auto max-h-[350px] space-y-2 pr-1">
+            <div className="flex-1 overflow-y-auto max-h-[360px] space-y-2 pr-1">
+              {/* Tab 1: Payments */}
               {monthDetailTab === 'payments' && (
-                inspectingMonth.paymentsList.length === 0 ? (
+                filteredPayments.length === 0 ? (
                   <div className="p-6 text-center text-xs text-text-secondary bg-secondary/30 rounded-xl">
-                    No fee payments recorded specifically under {inspectingMonth.shortName}.
+                    {modalSearchQuery 
+                      ? 'No fee payments match your search filter.'
+                      : `No fee payments recorded specifically under ${inspectingMonth.shortName}.`}
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {inspectingMonth.paymentsList.map((p) => {
+                    {filteredPayments.map((p) => {
                       const mem = members.find(m => m.id === p.memberId || m.name === p.memberName);
                       return (
-                      <div key={p.id} className="p-3 rounded-xl bg-secondary/40 border border-gray-800 flex items-center justify-between text-xs">
+                      <div key={p.id} className="p-3 rounded-xl bg-secondary/40 border border-gray-800 flex items-center justify-between text-xs hover:border-gray-700 transition-colors">
                         <div>
                           <span className="font-bold text-text-primary flex items-center gap-1.5">
                             <span>{p.memberName}</span>
@@ -1616,15 +1807,18 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                 )
               )}
 
+              {/* Tab 2: Expenses */}
               {monthDetailTab === 'expenses' && (
-                inspectingMonth.expensesList.length === 0 ? (
+                filteredExpenses.length === 0 ? (
                   <div className="p-6 text-center text-xs text-text-secondary bg-secondary/30 rounded-xl">
-                    No operational expenses recorded under {inspectingMonth.shortName}.
+                    {modalSearchQuery
+                      ? 'No expenses match your search filter.'
+                      : `No operational expenses recorded under ${inspectingMonth.shortName}.`}
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {inspectingMonth.expensesList.map((e) => (
-                      <div key={e.id} className="p-3 rounded-xl bg-secondary/40 border border-gray-800 flex items-center justify-between text-xs">
+                    {filteredExpenses.map((e) => (
+                      <div key={e.id} className="p-3 rounded-xl bg-secondary/40 border border-gray-800 flex items-center justify-between text-xs hover:border-gray-700 transition-colors">
                         <div>
                           <span className="font-bold text-text-primary block">{e.title}</span>
                           <span className="text-[10px] text-text-secondary font-mono">
@@ -1640,15 +1834,18 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                 )
               )}
 
+              {/* Tab 3: Staff Payroll */}
               {monthDetailTab === 'payrolls' && (
-                inspectingMonth.payrollList.length === 0 ? (
+                filteredPayrolls.length === 0 ? (
                   <div className="p-6 text-center text-xs text-text-secondary bg-secondary/30 rounded-xl">
-                    No staff payroll disbursement slips recorded for {inspectingMonth.shortName}.
+                    {modalSearchQuery
+                      ? 'No staff payroll slips match your search filter.'
+                      : `No staff payroll disbursement slips recorded for ${inspectingMonth.shortName}.`}
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {inspectingMonth.payrollList.map((pr) => (
-                      <div key={pr.id} className="p-3 rounded-xl bg-secondary/40 border border-gray-800 flex items-center justify-between text-xs">
+                    {filteredPayrolls.map((pr) => (
+                      <div key={pr.id} className="p-3 rounded-xl bg-secondary/40 border border-gray-800 flex items-center justify-between text-xs hover:border-gray-700 transition-colors">
                         <div>
                           <span className="font-bold text-text-primary block">{pr.staffName}</span>
                           <span className="text-[10px] text-text-secondary font-mono">
@@ -1663,12 +1860,131 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                   </div>
                 )
               )}
+
+              {/* Tab 4: Check-ins */}
+              {monthDetailTab === 'checkins' && (
+                filteredCheckIns.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-text-secondary bg-secondary/30 rounded-xl">
+                    {modalSearchQuery
+                      ? 'No attendance check-in logs match your search filter.'
+                      : `No attendance check-in logs recorded under ${inspectingMonth.shortName}.`}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredCheckIns.map((ci) => {
+                      const mem = members.find(m => m.id === ci.memberId || m.name === ci.memberName);
+                      return (
+                        <div key={ci.id} className="p-3 rounded-xl bg-secondary/40 border border-gray-800 flex items-center justify-between text-xs hover:border-gray-700 transition-colors">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-text-primary">{ci.memberName}</span>
+                              {mem && <ConsistentMemberStar member={mem} size="xs" />}
+                              {ci.gender && <GenderBadge gender={ci.gender} size="sm" />}
+                            </div>
+                            <div className="text-[10px] text-text-secondary font-mono flex flex-wrap items-center gap-2 mt-0.5">
+                              <span>Reg: #{ci.memberRegNo || 'N/A'}</span>
+                              <span>·</span>
+                              <span>Plan: {ci.plan || 'Monthly'}</span>
+                              {ci.category && (
+                                <>
+                                  <span>·</span>
+                                  <span className="text-amber-400 font-sans">{ci.category}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right flex flex-col items-end">
+                            <div className="flex items-center gap-1.5">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 font-mono">
+                                {ci.date}
+                              </span>
+                              {ci.time && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono flex items-center gap-1">
+                                  <span>⏱️</span>
+                                  <span>{ci.time}</span>
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
+                              <span>✓</span> Check-in logged {ci.time ? `(${ci.time})` : ''}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              )}
+
+              {/* Tab 5: New Joined Members */}
+              {monthDetailTab === 'newJoined' && (
+                filteredNewMembers.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-text-secondary bg-secondary/30 rounded-xl">
+                    {modalSearchQuery
+                      ? 'No new joined members match your search filter.'
+                      : `No new members joined specifically under ${inspectingMonth.shortName}.`}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredNewMembers.map((m) => (
+                      <div key={m.id} className="p-3 rounded-xl bg-secondary/40 border border-gray-800 flex items-center justify-between text-xs hover:border-gray-700 transition-colors">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-text-primary">{m.name}</span>
+                            <ConsistentMemberStar member={m} size="xs" />
+                            <GenderBadge gender={m.gender || 'Male'} size="sm" />
+                          </div>
+                          <div className="text-[10px] text-text-secondary font-mono flex flex-wrap items-center gap-2 mt-0.5">
+                            <span>Reg: #{m.registrationNo || 'N/A'}</span>
+                            <span>·</span>
+                            <span>Joined: {m.joinDate}</span>
+                            {m.phone && (
+                              <>
+                                <span>·</span>
+                                <span>📞 {m.phone}</span>
+                              </>
+                            )}
+                            <span>·</span>
+                            <span>{m.plan} ({m.category || 'Strength'})</span>
+                          </div>
+                        </div>
+                        <div className="text-right flex flex-col items-end">
+                          <span className="font-black text-emerald-400 text-sm font-mono">
+                            Rs. {(m.fee || 0).toLocaleString()}
+                          </span>
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full mt-1 ${
+                            m.feePaid 
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                              : (m.paidAmount && m.paidAmount > 0)
+                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                          }`}>
+                            {m.feePaid ? 'Paid' : (m.paidAmount && m.paidAmount > 0) ? `Partial (Due: Rs. ${((m.fee || 0) - m.paidAmount).toLocaleString()})` : 'Unpaid'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
             </div>
 
-            <div className="pt-2 border-t border-gray-800 flex justify-end">
+            <div className="pt-2 border-t border-gray-800 flex items-center justify-between">
+              <span className="text-[11px] text-text-secondary font-mono">
+                Showing{' '}
+                <strong className="text-text-primary">
+                  {monthDetailTab === 'payments' ? filteredPayments.length :
+                   monthDetailTab === 'expenses' ? filteredExpenses.length :
+                   monthDetailTab === 'payrolls' ? filteredPayrolls.length :
+                   monthDetailTab === 'checkins' ? filteredCheckIns.length : filteredNewMembers.length}
+                </strong> records
+              </span>
               <button
                 type="button"
-                onClick={() => setInspectingMonth(null)}
+                onClick={() => {
+                  setInspectingMonth(null);
+                  setModalSearchQuery('');
+                }}
                 className="px-4 py-2 bg-secondary hover:bg-gray-700 text-text-primary font-bold rounded-xl text-xs transition-all cursor-pointer"
               >
                 Close Details

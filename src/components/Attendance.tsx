@@ -3,18 +3,20 @@
 import React, { useState, useMemo } from 'react';
 import { Member, Role, Payment } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getLocalDateString, isMemberArchived } from '../lib/dateUtils';
+import { getLocalDateString, isMemberArchived, calculateStayDuration } from '../lib/dateUtils';
 import { getMemberFeeDetails } from '../lib/feeUtils';
 import { GenderBadge } from './Members';
 import { CloseIcon, LockIcon } from './icons';
 import { MaskedAmount } from './MaskedAmount';
 import { ConsistentMemberStar } from './ConsistentMemberStar';
-import { Pencil } from 'lucide-react';
+import { Pencil, Clock, LogOut, CheckCircle2 } from 'lucide-react';
 
 interface AttendanceProps {
   members: Member[];
   role: Role;
-  onUpdateAttendance: (memberId: string, date: string, present: boolean) => void;
+  onUpdateAttendance: (memberId: string, date: string, present: boolean, customTime?: string, customCheckOutTime?: string) => void;
+  onUpdateCheckOut?: (memberId: string, date: string, checkOutTime?: string) => void;
+  onCheckOutAllActive?: (date: string) => void;
   onWarning?: (message: string) => void;
   onUpdateMember?: (updatedMember: Member, paymentMethod?: Payment['method']) => void;
   isUnlocked?: boolean;
@@ -45,6 +47,8 @@ const Attendance: React.FC<AttendanceProps> = ({
   members, 
   role, 
   onUpdateAttendance, 
+  onUpdateCheckOut,
+  onCheckOutAllActive,
   onWarning, 
   onUpdateMember,
   isUnlocked = false,
@@ -55,6 +59,11 @@ const Attendance: React.FC<AttendanceProps> = ({
   const [genderFilter, setGenderFilter] = useState<'All' | 'Male' | 'Female'>('All');
   const [lastWarnedMemberId, setLastWarnedMemberId] = useState<string | null>(null);
   const [selectedMemberForDues, setSelectedMemberForDues] = useState<Member | null>(null);
+  const [editingTimeMember, setEditingTimeMember] = useState<{
+    member: Member;
+    checkInTime: string;
+    checkOutTime: string;
+  } | null>(null);
   
   const todayStr = getLocalDateString();
   const isFutureDate = selectedDate > todayStr;
@@ -188,12 +197,20 @@ const Attendance: React.FC<AttendanceProps> = ({
     });
   };
 
+  const activeInsideMembers = useMemo(() => {
+    return filteredMembers.filter(m => m.present && !m.checkOutTimes?.[selectedDate]);
+  }, [filteredMembers, selectedDate]);
+
+  const checkedOutMembers = useMemo(() => {
+    return filteredMembers.filter(m => m.present && !!m.checkOutTimes?.[selectedDate]);
+  }, [filteredMembers, selectedDate]);
+
   return (
     <div className="p-4 md:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-text-primary">Attendance Register</h1>
-          <p className="text-sm text-text-secondary mt-1">Track daily check-ins with Male & Female segregated metrics</p>
+          <p className="text-sm text-text-secondary mt-1">Track daily check-ins, check-outs, and live gym floor occupancy</p>
         </div>
 
         {/* Date Selector */}
@@ -212,6 +229,56 @@ const Attendance: React.FC<AttendanceProps> = ({
         </div>
       </div>
       
+      {/* Real-Time Facility Occupancy Strip */}
+      <div className="bg-surface border border-gray-800 rounded-2xl p-4 shadow-lg flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="relative flex h-3.5 w-3.5">
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${activeInsideMembers.length > 0 ? 'bg-emerald-400 opacity-75' : 'bg-gray-500 opacity-20'}`}></span>
+            <span className={`relative inline-flex rounded-full h-3.5 w-3.5 ${activeInsideMembers.length > 0 ? 'bg-emerald-500' : 'bg-gray-600'}`}></span>
+          </span>
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary flex items-center gap-1.5">
+              <span>Live Gym Floor Occupancy</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary text-text-secondary font-normal">
+                {selectedDate}
+              </span>
+            </h3>
+            <p className="text-[11px] text-text-secondary">
+              Members currently active in workout sessions vs departed
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <span className="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
+              <span>🏋️‍♂️</span>
+              <span>{activeInsideMembers.length} Active on Floor</span>
+            </span>
+            <span className="px-3 py-1.5 rounded-xl bg-blue-500/15 text-blue-400 font-bold border border-blue-500/30 flex items-center gap-1.5 shadow-sm">
+              <span>🚪</span>
+              <span>{checkedOutMembers.length} Checked Out</span>
+            </span>
+          </div>
+
+          {activeInsideMembers.length > 0 && onCheckOutAllActive && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(`Log check-out for all ${activeInsideMembers.length} active members on the gym floor?`)) {
+                  onCheckOutAllActive(selectedDate);
+                }
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow cursor-pointer"
+              title="Click to check out all members currently inside"
+            >
+              <span>🚪</span>
+              <span>Check Out All ({activeInsideMembers.length})</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Gender Segregated Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Total Attendance Stat Card */}
@@ -406,7 +473,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                 <th className="p-4">Gender</th>
                 <th className="p-4">Fee Status</th>
                 <th className="p-4">Balance / Dues</th>
-                <th className="p-4">Status</th>
+                <th className="p-4">Attendance, In/Out Times & Stay Duration</th>
                 <th className="p-4 text-center">Mark Attendance</th>
               </tr>
             </thead>
@@ -514,9 +581,85 @@ const Attendance: React.FC<AttendanceProps> = ({
                     )}
                   </td>
                   <td className="p-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${member.present ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
-                      {member.present ? 'Present' : 'Absent'}
-                    </span>
+                    <div className="flex flex-col items-start gap-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${member.present ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+                          {member.present ? 'Present' : 'Absent'}
+                        </span>
+                        {member.present && (
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 border ${
+                            member.checkOutTimes?.[selectedDate]
+                              ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                              : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 animate-pulse'
+                          }`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                            <span>{member.checkOutTimes?.[selectedDate] ? 'Departed' : 'On Gym Floor'}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {member.present && (
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs pt-0.5">
+                          {/* Entry / Check-In Time */}
+                          <button
+                            type="button"
+                            onClick={() => setEditingTimeMember({
+                              member,
+                              checkInTime: member.checkInTimes?.[selectedDate] || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }),
+                              checkOutTime: member.checkOutTimes?.[selectedDate] || ''
+                            })}
+                            className="text-[11px] font-mono text-amber-300 font-semibold flex items-center gap-1 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-lg border border-amber-500/25 transition-all cursor-pointer"
+                            title="Click to view or edit Entry Time"
+                          >
+                            <span>⏱️ In:</span>
+                            <span>{member.checkInTimes?.[selectedDate] || 'Logged'}</span>
+                            <Pencil className="w-2.5 h-2.5 opacity-50 ml-0.5" />
+                          </button>
+
+                          {/* Exit / Check-Out Time or 1-Click Check Out Button */}
+                          {member.checkOutTimes?.[selectedDate] ? (
+                            <button
+                              type="button"
+                              onClick={() => setEditingTimeMember({
+                                member,
+                                checkInTime: member.checkInTimes?.[selectedDate] || '06:30:00 PM',
+                                checkOutTime: member.checkOutTimes?.[selectedDate] || ''
+                              })}
+                              className="text-[11px] font-mono text-blue-300 font-semibold flex items-center gap-1 bg-blue-500/10 hover:bg-blue-500/20 px-2 py-0.5 rounded-lg border border-blue-500/25 transition-all cursor-pointer"
+                              title="Click to view or edit Departure Time"
+                            >
+                              <span>🚪 Out:</span>
+                              <span>{member.checkOutTimes[selectedDate]}</span>
+                              <Pencil className="w-2.5 h-2.5 opacity-50 ml-0.5" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+                                if (onUpdateCheckOut) {
+                                  onUpdateCheckOut(member.id, selectedDate, now);
+                                } else {
+                                  onUpdateAttendance(member.id, selectedDate, true, undefined, now);
+                                }
+                              }}
+                              className="text-[11px] font-bold text-white flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 px-2.5 py-0.5 rounded-lg border border-emerald-400 transition-all cursor-pointer shadow-sm"
+                              title="1-Click: Log Member Departure/Check-Out Now"
+                            >
+                              <span>🚪</span>
+                              <span>Check Out</span>
+                            </button>
+                          )}
+
+                          {/* Total Stay Duration Tag */}
+                          {member.checkInTimes?.[selectedDate] && (
+                            <span className="text-[10px] font-mono text-gray-300 bg-secondary/80 px-2 py-0.5 rounded-md border border-gray-700" title="Total facility workout duration">
+                              ⏳ {calculateStayDuration(member.checkInTimes[selectedDate], member.checkOutTimes?.[selectedDate])}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className="p-4 text-center">
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -546,6 +689,158 @@ const Attendance: React.FC<AttendanceProps> = ({
             setSelectedMemberForDues(null);
           }}
         />
+      )}
+
+      {/* Modal: Edit Check-in & Check-out Timestamps */}
+      {editingTimeMember && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-surface border border-gray-700 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-800">
+              <div>
+                <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+                  <span>⏱️</span>
+                  <span>Entry & Exit Timestamps</span>
+                </h3>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  {editingTimeMember.member.name} (#{editingTimeMember.member.registrationNo}) · {selectedDate}
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingTimeMember(null)}
+                className="p-1 rounded-lg text-text-secondary hover:text-text-primary hover:bg-secondary cursor-pointer"
+              >
+                <CloseIcon className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Check-In Field */}
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-amber-300">
+                  Entrance / Check-In Time
+                </label>
+                <input
+                  type="text"
+                  value={editingTimeMember.checkInTime}
+                  onChange={(e) => setEditingTimeMember({ ...editingTimeMember, checkInTime: e.target.value })}
+                  placeholder="e.g. 06:30:00 PM"
+                  className="w-full px-3 py-2 bg-secondary border border-gray-700 rounded-xl text-sm font-mono font-bold text-white focus:outline-none focus:border-amber-500"
+                />
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingTimeMember({
+                      ...editingTimeMember,
+                      checkInTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+                    })}
+                    className="px-2 py-0.5 rounded bg-secondary hover:bg-gray-700 text-[10px] font-mono text-amber-300 border border-gray-700 cursor-pointer"
+                  >
+                    ⚡ Current
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTimeMember({ ...editingTimeMember, checkInTime: '07:00:00 AM' })}
+                    className="px-2 py-0.5 rounded bg-secondary hover:bg-gray-700 text-[10px] font-mono text-gray-300 border border-gray-700 cursor-pointer"
+                  >
+                    🌅 07:00 AM
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTimeMember({ ...editingTimeMember, checkInTime: '06:30:00 PM' })}
+                    className="px-2 py-0.5 rounded bg-secondary hover:bg-gray-700 text-[10px] font-mono text-gray-300 border border-gray-700 cursor-pointer"
+                  >
+                    🌙 06:30 PM
+                  </button>
+                </div>
+              </div>
+
+              {/* Check-Out Field */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block font-semibold text-blue-300">
+                    Departure / Check-Out Time
+                  </label>
+                  {editingTimeMember.checkOutTime && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingTimeMember({ ...editingTimeMember, checkOutTime: '' })}
+                      className="text-[10px] text-red-400 hover:underline cursor-pointer"
+                    >
+                      Clear Check-Out
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={editingTimeMember.checkOutTime}
+                  onChange={(e) => setEditingTimeMember({ ...editingTimeMember, checkOutTime: e.target.value })}
+                  placeholder="e.g. 08:00:00 PM (or leave blank if on floor)"
+                  className="w-full px-3 py-2 bg-secondary border border-gray-700 rounded-xl text-sm font-mono font-bold text-white focus:outline-none focus:border-blue-500"
+                />
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingTimeMember({
+                      ...editingTimeMember,
+                      checkOutTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+                    })}
+                    className="px-2 py-0.5 rounded bg-secondary hover:bg-gray-700 text-[10px] font-mono text-blue-300 border border-gray-700 cursor-pointer"
+                  >
+                    ⚡ Current
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTimeMember({ ...editingTimeMember, checkOutTime: '08:30:00 AM' })}
+                    className="px-2 py-0.5 rounded bg-secondary hover:bg-gray-700 text-[10px] font-mono text-gray-300 border border-gray-700 cursor-pointer"
+                  >
+                    🌅 08:30 AM
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTimeMember({ ...editingTimeMember, checkOutTime: '08:00:00 PM' })}
+                    className="px-2 py-0.5 rounded bg-secondary hover:bg-gray-700 text-[10px] font-mono text-gray-300 border border-gray-700 cursor-pointer"
+                  >
+                    🌙 08:00 PM
+                  </button>
+                </div>
+              </div>
+
+              {/* Calculated Stay Duration preview */}
+              <div className="p-2.5 rounded-xl bg-secondary/80 border border-gray-800 flex items-center justify-between">
+                <span className="text-[11px] text-text-secondary">Estimated Facility Stay:</span>
+                <span className="text-xs font-mono font-bold text-emerald-400">
+                  {calculateStayDuration(editingTimeMember.checkInTime, editingTimeMember.checkOutTime)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-800">
+              <button
+                type="button"
+                onClick={() => setEditingTimeMember(null)}
+                className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-xl text-xs font-semibold text-text-primary cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateAttendance(
+                    editingTimeMember.member.id,
+                    selectedDate,
+                    true,
+                    editingTimeMember.checkInTime,
+                    editingTimeMember.checkOutTime
+                  );
+                  setEditingTimeMember(null);
+                }}
+                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white shadow-md cursor-pointer"
+              >
+                Save Timestamps
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
