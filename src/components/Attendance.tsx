@@ -490,19 +490,22 @@ const Attendance: React.FC<AttendanceProps> = ({
                 const todayStr = getLocalDateString();
                 const isExpired = new Date(member.expiryDate) < new Date(todayStr);
                 const feeDetails = getMemberFeeDetails(member);
+                const isCheckedOut = Boolean(member.checkOutTimes?.[selectedDate]);
+                // When checked out or present, row is completely normal (no red background tint, no red left border)
+                const showExpiredRowHighlight = isExpired && !isCheckedOut && !member.present;
                 return (
-                <tr key={member.id} className={`border-b border-secondary hover:bg-gray-700/50 transition-colors ${isExpired ? 'bg-red-900/30 border-l-4 border-l-red-500' : ''}`}>
+                <tr key={member.id} className={`border-b border-secondary hover:bg-gray-700/50 transition-colors ${showExpiredRowHighlight ? 'bg-red-900/30 border-l-4 border-l-red-500' : ''}`}>
                   <td className="p-4 font-medium">
                     <div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className={`font-semibold flex items-center gap-1.5 ${isExpired ? 'text-red-400 font-bold' : 'text-text-primary'}`}>
+                            <span className={`font-semibold flex items-center gap-1.5 ${showExpiredRowHighlight ? 'text-red-400 font-bold' : 'text-text-primary'}`}>
                                 <span>{member.name}</span>
                                 <ConsistentMemberStar member={member} size="sm" />
                             </span>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${CATEGORY_COLORS[member.category || 'Strength'] || 'bg-gray-500/20 text-gray-400'}`}>
                                 {member.category || 'Strength'}
                             </span>
-                            {isExpiringSoon(member.expiryDate, 1) && (
+                            {isExpiringSoon(member.expiryDate, 1) && !isCheckedOut && (
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${isExpired ? 'bg-red-500 text-white' : 'bg-yellow-500/20 text-yellow-400'}`} title="Membership is expiring soon!">
                                     {isExpired ? 'Expired' : 'Expiring'}
                                 </span>

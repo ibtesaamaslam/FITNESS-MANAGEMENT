@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Member, Payment } from '../types';
 import { isMemberArchived, getLocalDateString, calculateStayDuration } from '../lib/dateUtils';
+import { downloadElementAsPdf, printElement } from '../lib/pdfUtils';
 import { GenderBadge } from './Members';
 import { ConsistentMemberStar } from './ConsistentMemberStar';
 import { CloseIcon, SearchIcon } from './icons';
-import { ShieldCheck, Clock, Calendar, FileText, CheckCircle2, XCircle, Printer, Copy, Check, ShieldAlert, Search, LogOut } from 'lucide-react';
+import { ShieldCheck, Clock, Calendar, FileText, CheckCircle2, XCircle, Printer, Copy, Check, ShieldAlert, Search, LogOut, Download, Loader2 } from 'lucide-react';
 
 const CATEGORY_COLORS: { [key: string]: string } = {
   'Strength': 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
@@ -81,6 +82,23 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
     const [presenceFilter, setPresenceFilter] = useState<'all' | 'present'>('present');
     const [sessionFilter, setSessionFilter] = useState<'All' | 'Morning' | 'Evening'>('All');
     const [attendanceSearchTerm, setAttendanceSearchTerm] = useState('');
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+    const handleDownloadPdf = async () => {
+        setIsGeneratingPdf(true);
+        try {
+            await downloadElementAsPdf(
+                'printable-police-certificate',
+                `Saqib_Fitness_Police_Affidavit_${member.registrationNo || 'Member'}`
+            );
+        } finally {
+            setIsGeneratingPdf(false);
+        }
+    };
+
+    const handlePrint = () => {
+        printElement('printable-police-certificate', `Saqib Fitness Police Affidavit - ${member.name}`);
+    };
 
     // Compute detailed records from member.attendance and member.checkInTimes
     const detailedAttendanceRecords: AttendanceRecordDetail[] = useMemo(() => {
@@ -692,9 +710,29 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
                                         size: portrait;
                                         margin: 8mm 10mm;
                                     }
-                                    body {
+                                    html, body {
                                         background: white !important;
                                         color: black !important;
+                                        height: auto !important;
+                                        overflow: visible !important;
+                                    }
+                                    body * {
+                                        visibility: hidden !important;
+                                    }
+                                    #printable-police-certificate, #printable-police-certificate * {
+                                        visibility: visible !important;
+                                    }
+                                    #printable-police-certificate {
+                                        position: absolute !important;
+                                        left: 0 !important;
+                                        top: 0 !important;
+                                        width: 100% !important;
+                                        margin: 0 !important;
+                                        padding: 0 !important;
+                                        background: white !important;
+                                        color: black !important;
+                                        box-shadow: none !important;
+                                        border: none !important;
                                     }
                                 }
                             `}</style>
@@ -717,12 +755,22 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
                                 <div className="flex items-center gap-2">
                                     <button
                                         type="button"
-                                        onClick={() => window.print()}
+                                        onClick={handleDownloadPdf}
+                                        disabled={isGeneratingPdf}
+                                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                                        title="Instantly save and download official PDF certificate"
+                                    >
+                                        {isGeneratingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                                        <span>{isGeneratingPdf ? 'Saving PDF...' : 'Download PDF'}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handlePrint}
                                         className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
                                         title="Print single-page certified affidavit"
                                     >
                                         <Printer className="w-3.5 h-3.5" />
-                                        <span>Print / PDF</span>
+                                        <span>Print</span>
                                     </button>
                                     <button
                                         type="button"
@@ -735,7 +783,7 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
                             </div>
 
                             {/* DOCUMENT SCROLLABLE CONTAINER (FITS VIEWPORT & FITS ON 1 PRINTED PAGE) */}
-                            <div className="flex-1 overflow-y-auto pr-1 space-y-3 print:overflow-visible print:pr-0 print:space-y-2 text-xs">
+                            <div id="printable-police-certificate" className="flex-1 overflow-y-auto pr-1 space-y-3 print:overflow-visible print:pr-0 print:space-y-2 text-xs">
                                 {/* Letterhead */}
                                 <div className="text-center pb-2.5 border-b border-gray-700 print:border-black space-y-0.5">
                                     <h2 className="text-lg sm:text-xl font-black uppercase tracking-wider text-text-primary print:text-black">
@@ -875,7 +923,26 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
                             </div>
 
                             {/* Modal Footer (Hidden when printing) */}
-                            <div className="pt-2.5 border-t border-gray-700/80 flex justify-end print:hidden shrink-0">
+                            <div className="pt-2.5 border-t border-gray-700/80 flex items-center justify-between print:hidden shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadPdf}
+                                        disabled={isGeneratingPdf}
+                                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                                    >
+                                        {isGeneratingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                                        <span>Download PDF</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handlePrint}
+                                        className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                                    >
+                                        <Printer className="w-3.5 h-3.5" />
+                                        <span>Print</span>
+                                    </button>
+                                </div>
                                 <button
                                     type="button"
                                     onClick={() => setPoliceCertModalOpen(false)}
@@ -905,6 +972,26 @@ const FacilityPoliceInvestigationLog: React.FC<{
   const [sessionFilter, setSessionFilter] = useState<'All' | 'Morning' | 'Afternoon' | 'Evening'>('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [isGeneratingRosterPdf, setIsGeneratingRosterPdf] = useState(false);
+
+  const handleDownloadRosterPdf = async () => {
+    setIsGeneratingRosterPdf(true);
+    try {
+      await downloadElementAsPdf(
+        'printable-facility-roster',
+        `Saqib_Fitness_Police_Daily_Roster_${investigationDate}`
+      );
+    } finally {
+      setIsGeneratingRosterPdf(false);
+    }
+  };
+
+  const handlePrintRoster = () => {
+    printElement(
+      'printable-facility-roster',
+      `Saqib Fitness Facility Attendance Roster - ${investigationDate}`
+    );
+  };
 
   // Compute all members who checked in on investigationDate
   const checkedInMembers = useMemo(() => {
@@ -1231,9 +1318,29 @@ const FacilityPoliceInvestigationLog: React.FC<{
                   size: portrait;
                   margin: 8mm 10mm;
                 }
-                body {
+                html, body {
                   background: white !important;
                   color: black !important;
+                  height: auto !important;
+                  overflow: visible !important;
+                }
+                body * {
+                  visibility: hidden !important;
+                }
+                #printable-facility-roster, #printable-facility-roster * {
+                  visibility: visible !important;
+                }
+                #printable-facility-roster {
+                  position: absolute !important;
+                  left: 0 !important;
+                  top: 0 !important;
+                  width: 100% !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  background: white !important;
+                  color: black !important;
+                  box-shadow: none !important;
+                  border: none !important;
                 }
               }
             `}</style>
@@ -1255,12 +1362,22 @@ const FacilityPoliceInvestigationLog: React.FC<{
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={handleDownloadRosterPdf}
+                  disabled={isGeneratingRosterPdf}
+                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                  title="Instantly save and download facility roster PDF"
+                >
+                  {isGeneratingRosterPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                  <span>{isGeneratingRosterPdf ? 'Saving PDF...' : 'Download PDF'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePrintRoster}
                   className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
                   title="Print single-page certified roster"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Print / PDF</span>
+                  <span>Print</span>
                 </button>
                 <button
                   type="button"
@@ -1272,7 +1389,7 @@ const FacilityPoliceInvestigationLog: React.FC<{
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-1 space-y-3 print:overflow-visible print:pr-0 print:space-y-2 text-xs">
+            <div id="printable-facility-roster" className="flex-1 overflow-y-auto pr-1 space-y-3 print:overflow-visible print:pr-0 print:space-y-2 text-xs">
               <div className="text-center pb-2.5 border-b border-gray-700 print:border-black space-y-0.5">
                 <h2 className="text-lg sm:text-xl font-black uppercase tracking-wider text-text-primary print:text-black">
                   SAQIB FITNESS MANAGEMENT
@@ -1351,7 +1468,26 @@ const FacilityPoliceInvestigationLog: React.FC<{
               </div>
             </div>
 
-            <div className="pt-2.5 border-t border-gray-700/80 flex justify-end print:hidden shrink-0">
+            <div className="pt-2.5 border-t border-gray-700/80 flex items-center justify-between print:hidden shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadRosterPdf}
+                  disabled={isGeneratingRosterPdf}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                >
+                  {isGeneratingRosterPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                  <span>Download PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePrintRoster}
+                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print</span>
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setPrintModalOpen(false)}
