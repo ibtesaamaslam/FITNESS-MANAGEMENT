@@ -315,9 +315,10 @@ export const useGymData = () => {
 
         setPayments(prev => {
             const updatedPayments = prev.map(p => {
-                if (p.memberId === finalMember.id) {
+                if (p.memberId === finalMember.id || (oldMember && p.memberRegNo && p.memberRegNo === oldMember.registrationNo)) {
                     return {
                         ...p,
+                        memberId: finalMember.id,
                         memberName: finalMember.name,
                         memberRegNo: finalMember.registrationNo,
                     };

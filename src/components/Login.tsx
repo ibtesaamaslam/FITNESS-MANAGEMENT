@@ -155,8 +155,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
     };
 
     return (
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
-            <div className="bg-surface p-8 rounded-lg shadow-2xl w-full max-w-md border border-gray-700">
+        <div className="w-full h-full min-h-full flex-1 flex flex-col items-center justify-center p-4 bg-background overflow-y-auto">
+            <div className="bg-surface p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700/80 my-auto">
                 <div className="text-center mb-8">
                     <div className="bg-primary/20 p-4 rounded-full w-20 h-20 mx-auto flex items-center justify-center mb-4">
                         <LockIcon className="h-10 w-10 text-primary" />

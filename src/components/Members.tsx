@@ -572,11 +572,23 @@ const MemberModal: React.FC<{
     const [paymentStatusMode, setPaymentStatusMode] = useState<'paid' | 'partial' | 'unpaid'>('unpaid');
     const [paidAmountInput, setPaidAmountInput] = useState<string>('');
 
+    const nextInLineRegNo = useMemo(() => getNextRegistrationNo(existingMembers), [existingMembers]);
+
+    const duplicateMember = useMemo(() => {
+        const currentReg = (formData.registrationNo || '').trim().toLowerCase();
+        if (!currentReg) return null;
+        return existingMembers.find(m => 
+            m.id !== member?.id && 
+            (m.registrationNo || '').trim().toLowerCase() === currentReg
+        );
+    }, [formData.registrationNo, existingMembers, member?.id]);
+
     useEffect(() => {
         const autoRegNo = getNextRegistrationNo(existingMembers);
         const initialData: Partial<Member> & { paymentMethod?: Payment['method'] } = (member && member.id)
             ? { 
                 ...member, 
+                registrationNo: member.registrationNo || autoRegNo,
                 gender: member.gender || 'Male', 
                 remindersEnabled: member.remindersEnabled ?? true, 
                 category: member.category || 'Strength',
@@ -762,15 +774,54 @@ const MemberModal: React.FC<{
                         <div className="flex items-center justify-between border-b border-gray-800/70 pb-2.5">
                             <span className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
                                 <User className="h-3.5 w-3.5 text-primary" />
-                                Personal Information
+                                Personal Information & Reg #
                             </span>
-                            <span className="text-[11px] text-gray-400 font-mono">
-                                Auto-Assigned Reg #{formData.registrationNo}
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30 font-bold">
+                                    Next In-Line: #{nextInLineRegNo}
+                                </span>
+                            </div>
                         </div>
 
-                        {/* Main Info Row */}
+                        {/* Registration Number & Full Name */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* Registration Number (Fully Editable) */}
+                            <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-xs font-semibold text-text-secondary">
+                                        Registration No (Reg #) <span className="text-red-400">*</span>
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData(prev => ({ ...prev, registrationNo: nextInLineRegNo }))}
+                                        className="text-[10px] text-emerald-400 hover:text-emerald-300 font-mono font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                        title="Auto-fill with next available sequential number"
+                                    >
+                                        <span>Use Next #{nextInLineRegNo}</span>
+                                    </button>
+                                </div>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-mono text-xs font-bold">
+                                        #
+                                    </span>
+                                    <input 
+                                        type="text" 
+                                        name="registrationNo" 
+                                        value={formData.registrationNo || ''} 
+                                        onChange={handleChange} 
+                                        placeholder={nextInLineRegNo} 
+                                        className="w-full pl-8 pr-3 py-2.5 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary placeholder-gray-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-mono font-bold" 
+                                        required 
+                                    />
+                                </div>
+                                {duplicateMember && (
+                                    <p className="text-[11px] text-amber-400 mt-1 flex items-center gap-1 font-medium bg-amber-500/10 p-1.5 rounded border border-amber-500/20">
+                                        <span>⚠️</span>
+                                        <span>Reg #{formData.registrationNo} is currently assigned to <strong>{duplicateMember.name}</strong>.</span>
+                                    </p>
+                                )}
+                            </div>
+
                             {/* Full Name */}
                             <div>
                                 <label className="block text-xs font-semibold text-text-secondary mb-1">
@@ -788,7 +839,10 @@ const MemberModal: React.FC<{
                                     />
                                 </div>
                             </div>
+                        </div>
 
+                        {/* Gender & Age */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                             {/* Gender */}
                             <div>
                                 <label className="block text-xs font-semibold text-text-secondary mb-1">
@@ -821,27 +875,8 @@ const MemberModal: React.FC<{
                                     </button>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Age & Phone Number */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                            <div>
-                                <label className="block text-xs font-semibold text-text-secondary mb-1">
-                                    Phone Number <span className="text-red-400">*</span>
-                                </label>
-                                <div className="relative">
-                                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                    <input 
-                                        type="tel" 
-                                        name="phone" 
-                                        value={formData.phone || ''} 
-                                        onChange={handleChange} 
-                                        placeholder="0300-1234567" 
-                                        className="w-full pl-9 pr-3 py-2.5 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary placeholder-gray-500 focus:outline-none focus:border-primary transition-all font-mono" 
-                                        required 
-                                    />
-                                </div>
-                            </div>
+                            {/* Age */}
                             <div>
                                 <label className="block text-xs font-semibold text-text-secondary mb-1">
                                     Age (Years)
@@ -855,6 +890,25 @@ const MemberModal: React.FC<{
                                     onChange={handleChange} 
                                     placeholder="e.g. 24" 
                                     className="w-full px-3.5 py-2.5 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary focus:outline-none focus:border-primary transition-all font-mono" 
+                                />
+                            </div>
+                        </div>
+
+                        {/* Phone Number */}
+                        <div className="pt-1">
+                            <label className="block text-xs font-semibold text-text-secondary mb-1">
+                                Phone Number <span className="text-red-400">*</span>
+                            </label>
+                            <div className="relative">
+                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <input 
+                                    type="tel" 
+                                    name="phone" 
+                                    value={formData.phone || ''} 
+                                    onChange={handleChange} 
+                                    placeholder="0300-1234567" 
+                                    className="w-full pl-9 pr-3 py-2.5 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary placeholder-gray-500 focus:outline-none focus:border-primary transition-all font-mono" 
+                                    required 
                                 />
                             </div>
                         </div>
@@ -1192,6 +1246,7 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
     const [selectedMember, setSelectedMember] = useState<Partial<Member> | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [genderFilter, setGenderFilter] = useState<'All' | 'Male' | 'Female'>('All');
+    const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Expired' | 'Archived'>('All');
     const [showOnlyConsistent, setShowOnlyConsistent] = useState(false);
     const [lastWarnedMemberId, setLastWarnedMemberId] = useState<string | null>(null);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -1199,16 +1254,26 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [memberForReport, setMemberForReport] = useState<Member | null>(null);
 
-    const nonArchivedMembers = useMemo(() => {
-        return members.filter(m => !isMemberArchived(m));
-    }, [members]);
-
-    const totalCount = nonArchivedMembers.length;
-    const maleCount = nonArchivedMembers.filter(m => (m.gender || 'Male') === 'Male').length;
-    const femaleCount = nonArchivedMembers.filter(m => m.gender === 'Female').length;
     const todayStr = getLocalDateString();
-    const activeCount = nonArchivedMembers.filter(m => new Date(m.expiryDate) >= new Date(todayStr)).length;
-    const consistentCount = useMemo(() => nonArchivedMembers.filter(m => isConsistentMember(m, todayStr)).length, [nonArchivedMembers, todayStr]);
+    const totalCount = members.length;
+    const maleCount = useMemo(() => members.filter(m => (m.gender || 'Male') === 'Male').length, [members]);
+    const femaleCount = useMemo(() => members.filter(m => m.gender === 'Female').length, [members]);
+    const activeCount = useMemo(() => members.filter(m => new Date(m.expiryDate) >= new Date(todayStr) && !isMemberArchived(m)).length, [members, todayStr]);
+    const expiredCount = useMemo(() => members.filter(m => new Date(m.expiryDate) < new Date(todayStr) && !isMemberArchived(m)).length, [members, todayStr]);
+    const archivedCount = useMemo(() => members.filter(m => isMemberArchived(m)).length, [members]);
+    const consistentCount = useMemo(() => members.filter(m => isConsistentMember(m, todayStr)).length, [members, todayStr]);
+
+    const maxRegisteredNum = useMemo(() => {
+        let max = 0;
+        members.forEach(m => {
+            const digits = (m.registrationNo || '').replace(/\D/g, '');
+            if (digits) {
+                const n = parseInt(digits, 10);
+                if (!isNaN(n) && n > max) max = n;
+            }
+        });
+        return max;
+    }, [members]);
 
     const handleAddNew = () => {
         setSelectedMember({});
@@ -1264,23 +1329,31 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
             return isConsistentMember(m, todayStr);
         };
 
-        if (!rawTrimmed) {
-            return nonArchivedMembers.filter(m => {
-                const memberGender = m.gender || 'Male';
-                const genderOk = genderFilter === 'All' || memberGender === genderFilter;
-                return genderOk && meetsConsistency(m);
-            });
-        }
-
-        const query = rawTrimmed.toLowerCase();
-        const isPureNumeric = /^#?\d+$/.test(query);
-        const queryDigits = query.replace(/\D/g, '');
-        const queryNum = queryDigits !== '' ? parseInt(queryDigits, 10) : NaN;
-
         const meetsGender = (m: Member) => {
             const memberGender = m.gender || 'Male';
             return genderFilter === 'All' || memberGender === genderFilter;
         };
+
+        const meetsStatus = (m: Member) => {
+            if (statusFilter === 'All') return true;
+            const isArch = isMemberArchived(m);
+            const isExp = new Date(m.expiryDate) < new Date(todayStr);
+            if (statusFilter === 'Active') return !isArch && !isExp;
+            if (statusFilter === 'Expired') return !isArch && isExp;
+            if (statusFilter === 'Archived') return isArch;
+            return true;
+        };
+
+        // When NO search term is active, filter by status, gender, and consistency across all members
+        if (!rawTrimmed) {
+            return members.filter(m => meetsStatus(m) && meetsGender(m) && meetsConsistency(m));
+        }
+
+        // When searching, search across ALL members (active, expired, and archived like Reg 1-30)
+        const query = rawTrimmed.toLowerCase();
+        const isPureNumeric = /^#?\d+$/.test(query);
+        const queryDigits = query.replace(/\D/g, '');
+        const queryNum = queryDigits !== '' ? parseInt(queryDigits, 10) : NaN;
 
         const matchesExactReg = (m: Member) => {
             const reg = (m.registrationNo || '').trim().toLowerCase();
@@ -1298,13 +1371,13 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
         };
 
         if (isPureNumeric) {
-            const exactMatches = nonArchivedMembers.filter(m => matchesExactReg(m));
+            const exactMatches = members.filter(m => matchesExactReg(m));
             if (exactMatches.length > 0) {
                 return exactMatches.filter(m => meetsGender(m) && meetsConsistency(m));
             }
 
             if (queryDigits.length >= 10) {
-                const phoneMatches = nonArchivedMembers.filter(m => {
+                const phoneMatches = members.filter(m => {
                     const cleanPhone = (m.phone || '').replace(/\D/g, '');
                     return cleanPhone === queryDigits;
                 });
@@ -1314,14 +1387,15 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
             return [];
         }
 
-        return nonArchivedMembers.filter(m => {
+        return members.filter(m => {
             if (!meetsGender(m) || !meetsConsistency(m)) return false;
             return (
                 m.name.toLowerCase().includes(query) || 
-                m.registrationNo.toLowerCase().includes(query)
+                m.registrationNo.toLowerCase().includes(query) ||
+                (m.phone && m.phone.includes(query))
             );
         });
-    }, [nonArchivedMembers, genderFilter, searchTerm, showOnlyConsistent, todayStr]);
+    }, [members, statusFilter, genderFilter, searchTerm, showOnlyConsistent, todayStr]);
 
     // Check for expired members in search results to show warning
     useEffect(() => {
@@ -1387,73 +1461,106 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
                 </button>
             </div>
 
-            {/* Quick Gender & Active Demographics Pills */}
+            {/* Data Retention Guarantee & Integrity Alert */}
+            <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-xl px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
+                <div className="flex items-center gap-2.5">
+                    <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+                        <ShieldCheck className="w-4 h-4" />
+                    </span>
+                    <div>
+                        <span className="text-xs font-bold text-emerald-300 block">
+                            Permanent Records Guarantee & Preservation
+                        </span>
+                        <span className="text-[11px] text-text-secondary">
+                            All member registrations from Reg #1 up to Reg #{maxRegisteredNum || totalCount} and their historical payments are permanently stored and never automatically deleted.
+                        </span>
+                    </div>
+                </div>
+                <div className="text-[11px] font-mono text-emerald-400/90 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20 whitespace-nowrap self-start sm:self-auto">
+                    {totalCount} Total Registered Profiles
+                </div>
+            </div>
+
+            {/* Quick Status Demographics Cards (Clickable Filters) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {/* Total */}
                 <div 
-                    onClick={() => setGenderFilter('All')}
+                    onClick={() => setStatusFilter('All')}
                     className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                        genderFilter === 'All'
+                        statusFilter === 'All'
                             ? 'bg-teal-500/15 border-teal-500/50 shadow-md ring-2 ring-teal-500/30'
                             : 'bg-surface border-gray-800 hover:border-gray-700'
                     }`}
                 >
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">Total</span>
+                        <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">All Members</span>
                         <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-text-secondary font-medium">100%</span>
                     </div>
                     <div className="text-2xl font-black text-text-primary mt-1 font-mono">{totalCount}</div>
+                    <div className="text-[11px] text-text-secondary mt-1 font-mono">Reg #1 - #{maxRegisteredNum || totalCount}</div>
                 </div>
 
-                {/* Male Members */}
+                {/* Active Members */}
                 <div 
-                    onClick={() => setGenderFilter('Male')}
+                    onClick={() => setStatusFilter('Active')}
                     className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                        genderFilter === 'Male'
-                            ? 'bg-blue-500/20 border-blue-500 shadow-md ring-2 ring-blue-500/40'
-                            : 'bg-surface border-gray-800 hover:border-blue-500/30'
+                        statusFilter === 'Active'
+                            ? 'bg-emerald-500/20 border-emerald-500 shadow-md ring-2 ring-emerald-500/40'
+                            : 'bg-surface border-gray-800 hover:border-emerald-500/30'
                     }`}
                 >
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
-                            <span>♂</span> Male Members
+                        <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                            <span>✓</span> Active
                         </span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-medium">
-                            {totalCount > 0 ? Math.round((maleCount / totalCount) * 100) : 0}%
-                        </span>
-                    </div>
-                    <div className="text-2xl font-black text-blue-400 mt-1 font-mono">{maleCount}</div>
-                </div>
-
-                {/* Female Members */}
-                <div 
-                    onClick={() => setGenderFilter('Female')}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                        genderFilter === 'Female'
-                            ? 'bg-pink-500/20 border-pink-500 shadow-md ring-2 ring-pink-500/40'
-                            : 'bg-surface border-gray-800 hover:border-pink-500/30'
-                    }`}
-                >
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-pink-400 uppercase tracking-wider flex items-center gap-1">
-                            <span>♀</span> Female Members
-                        </span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 font-medium">
-                            {totalCount > 0 ? Math.round((femaleCount / totalCount) * 100) : 0}%
-                        </span>
-                    </div>
-                    <div className="text-2xl font-black text-pink-400 mt-1 font-mono">{femaleCount}</div>
-                </div>
-
-                {/* Active */}
-                <div className="p-4 rounded-xl border bg-surface border-gray-800">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Active</span>
                         <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium">
                             {totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0}%
                         </span>
                     </div>
                     <div className="text-2xl font-black text-emerald-400 mt-1 font-mono">{activeCount}</div>
+                    <div className="text-[11px] text-text-secondary mt-1">Valid membership</div>
+                </div>
+
+                {/* Expired Members */}
+                <div 
+                    onClick={() => setStatusFilter('Expired')}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                        statusFilter === 'Expired'
+                            ? 'bg-rose-500/20 border-rose-500 shadow-md ring-2 ring-rose-500/40'
+                            : 'bg-surface border-gray-800 hover:border-rose-500/30'
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1">
+                            <span>✕</span> Expired
+                        </span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-medium">
+                            {totalCount > 0 ? Math.round((expiredCount / totalCount) * 100) : 0}%
+                        </span>
+                    </div>
+                    <div className="text-2xl font-black text-rose-400 mt-1 font-mono">{expiredCount}</div>
+                    <div className="text-[11px] text-text-secondary mt-1">Pending renewal</div>
+                </div>
+
+                {/* Inactive / Archived Records */}
+                <div 
+                    onClick={() => setStatusFilter('Archived')}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                        statusFilter === 'Archived'
+                            ? 'bg-amber-500/20 border-amber-500 shadow-md ring-2 ring-amber-500/40'
+                            : 'bg-surface border-gray-800 hover:border-amber-500/30'
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                            <span>⏱️</span> Inactive (5+ mo)
+                        </span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-medium">
+                            {totalCount > 0 ? Math.round((archivedCount / totalCount) * 100) : 0}%
+                        </span>
+                    </div>
+                    <div className="text-2xl font-black text-amber-400 mt-1 font-mono">{archivedCount}</div>
+                    <div className="text-[11px] text-text-secondary mt-1">Preserved in system</div>
                 </div>
             </div>
 
@@ -1463,17 +1570,108 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
                 <div className="relative flex-1 max-w-md">
                     <input
                         type="text"
-                        placeholder="Search by name or Reg. No (e.g. SF-001)..."
+                        placeholder="Search any member name, Reg. No (e.g. 1, 001, SF-001)..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 bg-secondary border border-gray-700/80 rounded-xl text-sm font-medium text-text-primary placeholder-gray-500 outline-none focus:border-primary transition-all"
+                        className="w-full pl-9 pr-9 py-2 bg-secondary border border-gray-700/80 rounded-xl text-sm font-medium text-text-primary placeholder-gray-500 outline-none focus:border-primary transition-all"
                     />
                     <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
+                    {searchTerm && (
+                        <button
+                            type="button"
+                            onClick={() => setSearchTerm('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                        >
+                            ✕
+                        </button>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
+                    {/* Status Tabs */}
+                    <div className="flex items-center bg-secondary/80 p-1 rounded-xl border border-gray-700/80 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('All')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                statusFilter === 'All'
+                                    ? 'bg-primary text-white shadow'
+                                    : 'text-text-secondary hover:text-text-primary'
+                            }`}
+                        >
+                            All ({totalCount})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('Active')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                statusFilter === 'Active'
+                                    ? 'bg-emerald-600 text-white shadow'
+                                    : 'text-text-secondary hover:text-emerald-400'
+                            }`}
+                        >
+                            Active ({activeCount})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('Expired')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                statusFilter === 'Expired'
+                                    ? 'bg-rose-600 text-white shadow'
+                                    : 'text-text-secondary hover:text-rose-400'
+                            }`}
+                        >
+                            Expired ({expiredCount})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('Archived')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                statusFilter === 'Archived'
+                                    ? 'bg-amber-600 text-white shadow'
+                                    : 'text-text-secondary hover:text-amber-400'
+                            }`}
+                        >
+                            Inactive ({archivedCount})
+                        </button>
+                    </div>
+
+                    {/* Gender Filter Tabs */}
+                    <div className="flex items-center bg-secondary/80 p-1 rounded-xl border border-gray-700/80 shrink-0">
+                        <button
+                            onClick={() => setGenderFilter('All')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                genderFilter === 'All'
+                                    ? 'bg-gray-700 text-white shadow'
+                                    : 'text-text-secondary hover:text-text-primary'
+                            }`}
+                        >
+                            Genders
+                        </button>
+                        <button
+                            onClick={() => setGenderFilter('Male')}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                genderFilter === 'Male'
+                                    ? 'bg-blue-600 text-white shadow'
+                                    : 'text-text-secondary hover:text-blue-400'
+                            }`}
+                        >
+                            <span>♂</span>
+                        </button>
+                        <button
+                            onClick={() => setGenderFilter('Female')}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                genderFilter === 'Female'
+                                    ? 'bg-pink-600 text-white shadow'
+                                    : 'text-text-secondary hover:text-pink-400'
+                            }`}
+                        >
+                            <span>♀</span>
+                        </button>
+                    </div>
+
                     {/* Consistent Member Filter Tab */}
                     <button
                         type="button"
@@ -1488,40 +1686,6 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
                         <span className="text-amber-400">⭐</span>
                         <span>Consistent ({consistentCount})</span>
                     </button>
-
-                    {/* Gender Filter Tabs */}
-                    <div className="flex items-center bg-secondary/80 p-1 rounded-xl border border-gray-700/80 shrink-0">
-                        <button
-                            onClick={() => setGenderFilter('All')}
-                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                genderFilter === 'All'
-                                    ? 'bg-primary text-white shadow'
-                                    : 'text-text-secondary hover:text-text-primary'
-                            }`}
-                        >
-                            All ({totalCount})
-                        </button>
-                        <button
-                            onClick={() => setGenderFilter('Male')}
-                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                                genderFilter === 'Male'
-                                    ? 'bg-blue-600 text-white shadow'
-                                    : 'text-text-secondary hover:text-blue-400'
-                            }`}
-                        >
-                            <span>♂</span> Male ({maleCount})
-                        </button>
-                        <button
-                            onClick={() => setGenderFilter('Female')}
-                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                                genderFilter === 'Female'
-                                    ? 'bg-pink-600 text-white shadow'
-                                    : 'text-text-secondary hover:text-pink-400'
-                            }`}
-                        >
-                            <span>♀</span> Female ({femaleCount})
-                        </button>
-                    </div>
                 </div>
             </div>
 
@@ -1536,7 +1700,7 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
                                 <th className="p-4">Category</th>
                                 <th className="p-4">Plan</th>
                                 <th className="p-4">Fee Status</th>
-                                <th className="p-4">Expiry Date</th>
+                                <th className="p-4">Expiry & Status</th>
                                 <th className="p-4">Actions</th>
                             </tr>
                         </thead>
@@ -1547,14 +1711,26 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
                                         No members found matching your filter criteria.
                                     </td>
                                 </tr>
-                            ) : filteredMembers.map(member => (
-                                <tr key={member.id} className="border-b border-secondary hover:bg-gray-700/50 transition-colors">
-                                    <td className="p-4 font-mono text-text-secondary font-semibold">{member.registrationNo}</td>
+                            ) : filteredMembers.map(member => {
+                                const isArchived = isMemberArchived(member);
+                                const isExpired = new Date(member.expiryDate) < new Date(todayStr);
+                                return (
+                                <tr key={member.id} className={`border-b border-secondary hover:bg-gray-700/50 transition-colors ${isArchived ? 'bg-secondary/30' : ''}`}>
+                                    <td className="p-4 font-mono font-bold text-emerald-400">
+                                        <span className="px-2 py-1 rounded bg-secondary/80 border border-gray-700 font-mono text-xs">
+                                            #{member.registrationNo}
+                                        </span>
+                                    </td>
                                     <td className="p-4">
                                         <div>
                                             <div className="font-medium text-text-primary flex items-center gap-1.5">
                                                 <span>{member.name}</span>
                                                 <ConsistentMemberStar member={member} size="sm" />
+                                                {isArchived && (
+                                                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-medium">
+                                                        Inactive (5+ mo)
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="text-xs text-text-secondary font-mono">{member.phone}</div>
                                         </div>
@@ -1598,13 +1774,25 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
                                         })()}
                                     </td>
                                     <td className="p-4">
-                                        <div className="flex items-center">
-                                            <span>{member.expiryDate}</span>
-                                            {isExpiringSoon(member.expiryDate, 1) && (
-                                                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-400" title="Membership is expiring soon!">
-                                                    Expiring
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={`font-mono text-xs ${isExpired ? 'text-rose-400 font-bold' : 'text-text-secondary'}`}>
+                                                    {member.expiryDate}
                                                 </span>
-                                            )}
+                                                {isExpiringSoon(member.expiryDate, 1) && !isExpired && (
+                                                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-yellow-500/20 text-yellow-400" title="Membership is expiring soon!">
+                                                        Expiring
+                                                    </span>
+                                                )}
+                                                {isExpired && (
+                                                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                                                        Expired
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span className="text-[10px] text-gray-500 font-mono">
+                                                Joined: {member.joinDate}
+                                            </span>
                                         </div>
                                     </td>
                                     <td className="p-4 flex items-center space-x-2">
@@ -1617,7 +1805,8 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
                                         )}
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

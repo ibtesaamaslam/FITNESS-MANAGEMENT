@@ -82,27 +82,25 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
 
   const filteredMembers = useMemo(() => {
     const rawTrimmed = searchQuery.trim();
+    const meetsDropdownFilters = (member: Member) => {
+      const isArchived = isMemberArchived(member);
+      const genderMatch = filterGender === 'All' || (member.gender || 'Male') === filterGender;
+      const planMatch = filterPlan === 'All' || member.plan === filterPlan;
+      let statusMatch = true;
+      if (filterStatus === 'Paid') statusMatch = member.feePaid;
+      else if (filterStatus === 'Unpaid') statusMatch = !member.feePaid;
+      else if (filterStatus === 'Archived') statusMatch = isArchived;
+      return genderMatch && planMatch && statusMatch;
+    };
+
     if (!rawTrimmed) {
-      return members.filter(member => {
-        if (isMemberArchived(member)) return false;
-        const genderMatch = filterGender === 'All' || (member.gender || 'Male') === filterGender;
-        const planMatch = filterPlan === 'All' || member.plan === filterPlan;
-        const statusMatch = filterStatus === 'All' || (filterStatus === 'Paid' && member.feePaid) || (filterStatus === 'Unpaid' && !member.feePaid);
-        return genderMatch && planMatch && statusMatch;
-      });
+      return members.filter(meetsDropdownFilters);
     }
 
     const query = rawTrimmed.toLowerCase();
     const isPureNumeric = /^#?\d+$/.test(query);
     const queryDigits = query.replace(/\D/g, '');
     const queryNum = queryDigits !== '' ? parseInt(queryDigits, 10) : NaN;
-
-    const meetsDropdownFilters = (member: Member) => {
-      const genderMatch = filterGender === 'All' || (member.gender || 'Male') === filterGender;
-      const planMatch = filterPlan === 'All' || member.plan === filterPlan;
-      const statusMatch = filterStatus === 'All' || (filterStatus === 'Paid' && member.feePaid) || (filterStatus === 'Unpaid' && !member.feePaid);
-      return genderMatch && planMatch && statusMatch;
-    };
 
     const matchesExactReg = (m: Member) => {
       const reg = (m.registrationNo || '').trim().toLowerCase();
@@ -119,30 +117,26 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
       return false;
     };
 
-    const activeMembers = members.filter(m => !isMemberArchived(m));
-
-    // When the user searches any number (e.g. "1", "001", "#500"), return ONLY exact matches!
+    // When searching by numeric RegNo across ALL members
     if (isPureNumeric) {
-      const exactRegMatches = activeMembers.filter(m => matchesExactReg(m));
+      const exactRegMatches = members.filter(m => matchesExactReg(m));
       if (exactRegMatches.length > 0) {
         return exactRegMatches.filter(meetsDropdownFilters);
       }
 
-      // Only check phone if a complete full 10-11 digit phone number was entered
       if (queryDigits.length >= 10) {
-        const phoneMatches = activeMembers.filter(m => {
+        const phoneMatches = members.filter(m => {
           const cleanPhone = (m.phone || '').replace(/\D/g, '');
           return cleanPhone === queryDigits;
         });
         return phoneMatches.filter(meetsDropdownFilters);
       }
 
-      // When a number is searched and there is no exact registration match, strictly return empty
       return [];
     }
 
-    // Standard text search by Name or Registration Number
-    return activeMembers.filter(member => {
+    // Standard text search by Name or Registration Number across ALL members
+    return members.filter(member => {
       if (!meetsDropdownFilters(member)) return false;
       const nameMatch = member.name.toLowerCase().includes(query);
       const regMatch = member.registrationNo ? member.registrationNo.toLowerCase().includes(query) : false;
@@ -151,12 +145,14 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
   }, [members, filterGender, filterPlan, filterStatus, searchQuery]);
   
   const paymentsInMonth = useMemo(() => {
+     if (filterMonth === 'all') return payments;
      return payments.filter(p => p.date.startsWith(filterMonth));
   }, [payments, filterMonth]);
   
   const totalRevenue = paymentsInMonth.reduce((sum, p) => sum + p.amount, 0);
 
   const monthlyAccessorySales = useMemo(() => {
+     if (filterMonth === 'all') return accessorySales || [];
      return (accessorySales || []).filter(s => s.date.startsWith(filterMonth));
   }, [accessorySales, filterMonth]);
 
@@ -364,15 +360,47 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-secondary/90 border border-gray-700/80 px-3 py-1.5 rounded-xl">
             <label htmlFor="month" className="text-xs font-bold text-text-secondary uppercase tracking-wider whitespace-nowrap">
-              Filter by Month:
+              Filter:
             </label>
-            <input 
-              type="month" 
-              id="month"
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
-              className="bg-transparent text-sm font-bold text-text-primary outline-none cursor-pointer"
-            />
+            {filterMonth !== 'all' ? (
+              <input 
+                type="month" 
+                id="month"
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(e.target.value)}
+                className="bg-transparent text-sm font-bold text-text-primary outline-none cursor-pointer"
+              />
+            ) : (
+              <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                All Time (Lifetime)
+              </span>
+            )}
+            <div className="flex items-center gap-1 border-l border-gray-700/80 pl-2">
+              <button
+                type="button"
+                onClick={() => setFilterMonth(getLocalMonthString())}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                  filterMonth === getLocalMonthString()
+                    ? 'bg-primary text-white'
+                    : 'text-text-secondary hover:text-white bg-secondary/80'
+                }`}
+                title="View current month"
+              >
+                Current
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMonth('all')}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                  filterMonth === 'all'
+                    ? 'bg-primary text-white'
+                    : 'text-text-secondary hover:text-white bg-secondary/80'
+                }`}
+                title="View all historical transactions of all months"
+              >
+                All-Time
+              </button>
+            </div>
           </div>
           
           {viewMode === 'status' && (
@@ -423,6 +451,7 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
                   <option value="All">All Statuses</option>
                   <option value="Paid">Paid</option>
                   <option value="Unpaid">Unpaid</option>
+                  <option value="Archived">Inactive (5+ mo)</option>
                 </select>
               </div>
             </>
@@ -445,7 +474,7 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
         <div className="bg-surface p-4 rounded-xl shadow-lg border border-emerald-500/40 bg-emerald-950/20 flex flex-col justify-between">
           <div>
             <p className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider">
-              Total Revenue ({new Date(filterMonth + '-02').toLocaleString('default', { month: 'short' })})
+              Total Revenue ({filterMonth === 'all' ? 'All Time' : new Date(filterMonth + '-02').toLocaleString('default', { month: 'short' })})
             </p>
             <div className="text-2xl font-black text-emerald-400 mt-1">
               <MaskedAmount amount={totalRevenue} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
@@ -550,7 +579,7 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
                 </span>
               )}
               <span className="text-gray-400">
-                Showing <strong className="text-text-primary font-mono">{filteredMembers.length}</strong> of <strong className="text-text-primary font-mono">{members.filter(m => !isMemberArchived(m)).length}</strong> members
+                Showing <strong className="text-text-primary font-mono">{filteredMembers.length}</strong> of <strong className="text-text-primary font-mono">{members.length}</strong> members
               </span>
             </div>
           </div>
@@ -599,11 +628,16 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
                 ) : (
                   filteredMembers.map(member => {
                     const todayStr = getLocalDateString();
+                    const isArchived = isMemberArchived(member);
                     const isExpired = new Date(member.expiryDate) < new Date(todayStr);
                     const needsReminder = (!member.feePaid || isExpiringSoon(member.expiryDate)) && (member.remindersEnabled ?? true);
                     return (
                       <tr key={member.id} className={`border-b border-secondary hover:bg-gray-700/50 ${!member.feePaid || isExpired ? 'bg-red-900/40 border-l-4 border-l-red-500 text-red-100' : ''}`}>
-                        <td className="p-4 font-mono text-text-secondary">{member.registrationNo}</td>
+                        <td className="p-4 font-mono text-emerald-400 font-bold">
+                          <span className="px-2 py-1 rounded bg-secondary/80 border border-gray-700 font-mono text-xs">
+                            #{member.registrationNo}
+                          </span>
+                        </td>
                         <td className="p-4 font-medium">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="flex items-center gap-1.5">
@@ -626,9 +660,16 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
                           <MaskedAmount amount={member.fee} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
                         </td>
                         <td className="p-4">
-                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${member.feePaid ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                            {member.feePaid ? 'Paid' : 'Unpaid'}
-                          </span>
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${member.feePaid ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                              {member.feePaid ? 'Paid' : 'Unpaid'}
+                            </span>
+                            {isArchived && (
+                              <span className="text-[10px] text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 font-medium">
+                                Inactive (5+ mo)
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className={`p-4 ${isExpired ? 'text-red-400 font-bold' : ''}`}>
                           {member.expiryDate} {isExpired && "(Expired)"}
@@ -775,7 +816,7 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
                   </span>
                 )}
                 <span className="text-gray-400">
-                  Showing <strong className="text-text-primary font-mono">{filteredPayments.length}</strong> of <strong className="text-text-primary font-mono">{paymentsInMonth.length}</strong> payments ({new Date(filterMonth + '-02').toLocaleString('default', { month: 'short' })})
+                  Showing <strong className="text-text-primary font-mono">{filteredPayments.length}</strong> of <strong className="text-text-primary font-mono">{paymentsInMonth.length}</strong> payments ({filterMonth === 'all' ? 'All Time' : new Date(filterMonth + '-02').toLocaleString('default', { month: 'short' })})
                 </span>
               </div>
             </div>
@@ -795,7 +836,7 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
                   {filteredPayments.length > 0 ? (
                     filteredPayments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(payment => {
                       const isAccessory = payment.type === 'Accessory' || payment.memberRegNo === 'ACC';
-                      const memberForPayment = members.find(m => m.id === payment.memberId);
+                      const memberForPayment = members.find(m => m.id === payment.memberId || (payment.memberRegNo && m.registrationNo === payment.memberRegNo));
                       const category = memberForPayment ? memberForPayment.category : 'Strength';
                       return (
                         <tr key={payment.id} className="border-b border-secondary hover:bg-gray-700/50">

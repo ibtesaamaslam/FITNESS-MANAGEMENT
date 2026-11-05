@@ -72,17 +72,13 @@ const Attendance: React.FC<AttendanceProps> = ({
     setSelectedDate(e.target.value);
   };
   
-  const nonArchivedMembers = useMemo(() => {
-    return members.filter(member => !isMemberArchived(member));
-  }, [members]);
-
   const attendanceForDate = useMemo(() => {
-    return nonArchivedMembers.map(member => ({
+    return members.map(member => ({
       ...member,
       gender: member.gender || 'Male',
       present: member.attendance[selectedDate] || false,
     }));
-  }, [nonArchivedMembers, selectedDate]);
+  }, [members, selectedDate]);
 
   // Calculations for overall gender stats on selected date
   const maleAttendance = useMemo(() => attendanceForDate.filter(m => m.gender === 'Male'), [attendanceForDate]);

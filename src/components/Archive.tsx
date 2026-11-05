@@ -47,13 +47,24 @@ const Archive: React.FC<ArchiveProps> = ({ members, role = 'Admin', onDeleteMemb
 
   return (
     <div className="p-4 md:p-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
           <h1 className="text-3xl font-bold">Archive (Inactive Records)</h1>
-          <p className="text-text-secondary mt-1">Members consistently absent or inactive for more than 5 months are automatically archived.</p>
+          <p className="text-text-secondary mt-1">Members absent for more than 5 months are cataloged here for historical tracking.</p>
         </div>
-        <div className="bg-red-500/20 text-red-400 px-4 py-2 rounded-xl border border-red-500/30 font-bold self-start sm:self-auto font-mono text-sm">
-          {archivedMembers.length} Total Archived
+        <div className="bg-amber-500/20 text-amber-300 px-4 py-2 rounded-xl border border-amber-500/30 font-bold self-start sm:self-auto font-mono text-sm">
+          {archivedMembers.length} Inactive / Archived Profiles
+        </div>
+      </div>
+
+      {/* Preservation & Retention Assurance Banner */}
+      <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-3 mb-6 flex items-center gap-3">
+        <span className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-sm">
+          ✓
+        </span>
+        <div className="text-xs text-text-secondary">
+          <strong className="text-emerald-300 font-semibold block">All Records & Previous Payments are 100% Permanently Preserved</strong>
+          <span>Being in the Archive does not mean deleted. Members listed here (including historical Reg #1–#30) retain all their past payments, attendance logs, and profile data in full.</span>
         </div>
       </div>
 

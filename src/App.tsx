@@ -79,6 +79,7 @@ const App: React.FC = () => {
         localStorage.setItem('theme', theme);
     }, [theme]);
 
+
     // Notification State
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
@@ -243,10 +244,10 @@ const App: React.FC = () => {
 
     if (!isLoggedIn) {
         return (
-            <>
+            <div className="w-full h-full min-h-full flex-1 flex flex-col items-center justify-center bg-background">
                 <Login onLogin={handleLogin} gymName={gymName} onUpdateGymName={handleUpdateGymName} />
                 <ToastContainer toasts={toasts} removeToast={removeToast} />
-            </>
+            </div>
         );
     }
 
@@ -450,6 +451,7 @@ const App: React.FC = () => {
                     </button>
                 </div>
 
+
                 {/* Gym Name Customizer */}
                 <div className="px-4 py-2 bg-secondary/40 rounded-lg border border-gray-800/50 space-y-1.5">
                     <div className="flex items-center justify-between">
@@ -498,7 +500,7 @@ const App: React.FC = () => {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
-            className="flex h-screen bg-background w-full overflow-hidden"
+            className="flex h-full min-h-full bg-background w-full overflow-hidden"
         >
             <ToastContainer toasts={toasts} removeToast={removeToast} />
 

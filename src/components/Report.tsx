@@ -50,7 +50,7 @@ const getSessionPeriod = (timeStr: string): 'Morning' | 'Afternoon' | 'Evening' 
 
 const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = ({ member, payments }) => {
     const memberPayments = payments
-        .filter(p => p.memberId === member.id)
+        .filter(p => p.memberId === member.id || (p.memberRegNo && p.memberRegNo === member.registrationNo))
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     const totalPaid = useMemo(() => {

@@ -299,7 +299,7 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
             </div>
           </div>
 
-          <div className="flex-1 w-full min-h-[300px] h-[340px]">
+          <div className="flex-1 w-full min-h-[300px] h-[360px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart 
                 data={attendanceData} 
@@ -372,64 +372,64 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
           </div>
         </div>
 
-        {/* Quick Actions Panel */}
+        {/* Quick Actions Panel - Larger, High-Visibility Buttons */}
         <div className="bg-surface p-5 sm:p-6 rounded-xl shadow-lg border border-gray-800/80 flex flex-col justify-between">
           <h2 className="text-base font-bold mb-3 text-text-primary tracking-tight">Quick Actions</h2>
-          <div className="space-y-2 my-auto">
+          <div className="space-y-2.5 my-auto">
             <button 
               onClick={() => onNavigate('members')} 
-              className="w-full bg-[#10b981] hover:bg-[#059669] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#10b981] hover:bg-[#059669] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
             >
-              <UserPlusIcon className="h-4 w-4" />
+              <UserPlusIcon className="h-4.5 w-4.5" />
               <span>Add Member</span>
             </button>
             <button 
               onClick={() => onNavigate('fees')} 
-              className="w-full bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
             >
-              <ReceiptIcon className="h-4 w-4" />
+              <ReceiptIcon className="h-4.5 w-4.5" />
               <span>Record Payment</span>
             </button>
             <button 
               onClick={() => onNavigate('attendance')} 
-              className="w-full bg-[#eab308] hover:bg-[#ca8a04] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#eab308] hover:bg-[#ca8a04] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
             >
-              <ClipboardListIcon className="h-4 w-4" />
+              <ClipboardListIcon className="h-4.5 w-4.5" />
               <span>Mark Attendance</span>
             </button>
             <button 
               onClick={() => onNavigate('dailyledger')} 
-              className="w-full bg-[#f97316] hover:bg-[#ea580c] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#f97316] hover:bg-[#ea580c] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
             >
-              <LedgerIcon className="h-4 w-4" />
+              <LedgerIcon className="h-4.5 w-4.5" />
               <span>Daily Ledger</span>
             </button>
             <button 
               onClick={() => onNavigate('expenses')} 
-              className="w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
             >
-              <ExpenseIcon className="h-4 w-4" />
+              <ExpenseIcon className="h-4.5 w-4.5" />
               <span>Monthly Expense</span>
             </button>
             <button 
               onClick={() => onNavigate('accessories')} 
-              className="w-full bg-[#ec4899] hover:bg-[#db2777] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#ec4899] hover:bg-[#db2777] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
             >
-              <AccessoriesIcon className="h-4 w-4" />
+              <AccessoriesIcon className="h-4.5 w-4.5" />
               <span>Store Accessories</span>
             </button>
             <button 
               onClick={() => onNavigate('staff')} 
-              className="w-full bg-[#14b8a6] hover:bg-[#0d9488] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#14b8a6] hover:bg-[#0d9488] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
             >
-              <StaffIcon className="h-4 w-4" />
+              <StaffIcon className="h-4.5 w-4.5" />
               <span>Staff & Payroll</span>
             </button>
             <button 
               onClick={() => onNavigate('backup')} 
-              className="w-full bg-[#ef4444] hover:bg-[#dc2626] text-white font-bold py-2 px-3.5 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#ef4444] hover:bg-[#dc2626] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
             >
-              <BackupIcon className="h-4 w-4" />
+              <BackupIcon className="h-4.5 w-4.5" />
               <span>Backup & Restore</span>
             </button>
           </div>
