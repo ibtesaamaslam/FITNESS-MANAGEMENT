@@ -13,7 +13,7 @@ interface DailyLedgerProps {
   onUnlockRequest?: () => void;
 }
 
-export type SheetType = 'All' | 'Cash' | 'Easypaisa' | 'JazzCash' | 'Bank Transfer';
+export type LedgerMethodTab = 'All' | 'Cash' | 'Easypaisa' | 'JazzCash' | 'Bank Transfer';
 
 const CATEGORY_COLORS: { [key: string]: string } = {
   'Strength': 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
@@ -29,52 +29,47 @@ const getNormalizedMethod = (method: string): 'Cash' | 'Easypaisa' | 'JazzCash' 
   return 'Cash';
 };
 
-const SHEET_METADATA = {
+const TAB_METADATA = {
   'All': {
     label: 'All Transactions',
     badge: 'Master Ledger',
     colorClass: 'text-primary border-primary bg-primary/10',
     activeTabClass: 'bg-primary text-white shadow-lg shadow-emerald-950/30 font-bold',
-    description: 'Consolidated master sheet containing all payment methods',
-    icon: '📑',
+    description: 'Consolidated master view containing all payment methods',
   },
   'Cash': {
-    label: 'Cash Sheet',
+    label: 'Cash',
     badge: 'Cash Register',
     colorClass: 'text-emerald-400 border-emerald-500/40 bg-emerald-950/20',
     activeTabClass: 'bg-emerald-600 text-white shadow-lg shadow-emerald-950/40 font-bold',
     description: 'Physical cash collected at front desk counter',
-    icon: '💵',
   },
   'Easypaisa': {
-    label: 'Easypaisa Sheet',
+    label: 'Easypaisa',
     badge: 'Mobile Account',
     colorClass: 'text-cyan-400 border-cyan-500/40 bg-cyan-950/20',
     activeTabClass: 'bg-cyan-600 text-white shadow-lg shadow-cyan-950/40 font-bold',
     description: 'Mobile wallet transfers received through Easypaisa',
-    icon: '📱',
   },
   'JazzCash': {
-    label: 'JazzCash Sheet',
+    label: 'JazzCash',
     badge: 'Mobile Account',
     colorClass: 'text-orange-400 border-orange-500/40 bg-orange-950/20',
     activeTabClass: 'bg-orange-600 text-white shadow-lg shadow-orange-950/40 font-bold',
     description: 'Mobile wallet transfers received through JazzCash',
-    icon: '⚡',
   },
   'Bank Transfer': {
-    label: 'Bank Transfer Sheet',
+    label: 'Bank Transfer',
     badge: 'Bank Account',
     colorClass: 'text-purple-400 border-purple-500/40 bg-purple-950/20',
     activeTabClass: 'bg-purple-600 text-white shadow-lg shadow-purple-950/40 font-bold',
     description: 'Direct IBFT & Online Bank transfers to gym account',
-    icon: '🏦',
   },
 };
 
 const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked = false, onUnlockRequest }) => {
   const [selectedDate, setSelectedDate] = useState(getLocalDateString());
-  const [activeSheet, setActiveSheet] = useState<SheetType>('All');
+  const [activeTab, setActiveTab] = useState<LedgerMethodTab>('All');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Daily transactions for the chosen date
@@ -128,23 +123,23 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
     return dailyPayments.reduce((sum, p) => sum + p.amount, 0);
   }, [dailyPayments]);
 
-  // Filter payments by active sheet
-  const sheetPayments = useMemo(() => {
-    if (activeSheet === 'All') return dailyPayments;
-    return dailyPayments.filter(p => getNormalizedMethod(p.method) === activeSheet);
-  }, [dailyPayments, activeSheet]);
+  // Filter payments by active tab
+  const filteredTabPayments = useMemo(() => {
+    if (activeTab === 'All') return dailyPayments;
+    return dailyPayments.filter(p => getNormalizedMethod(p.method) === activeTab);
+  }, [dailyPayments, activeTab]);
 
-  // Search filtered sheet payments
-  const filteredSheetPayments = useMemo(() => {
+  // Search filtered payments
+  const searchedPayments = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return sheetPayments;
+    if (!q) return filteredTabPayments;
 
     const cleanQ = q.replace(/^#/, '');
     const isNumeric = /^\d+$/.test(cleanQ);
 
     if (isNumeric) {
       const qNum = parseInt(cleanQ, 10);
-      return sheetPayments.filter(p => {
+      return filteredTabPayments.filter(p => {
         const member = members.find(m => m.id === p.memberId);
         const regStr = String(p.memberRegNo || member?.registrationNo || '').trim().toLowerCase().replace(/^#/, '');
         if (regStr === cleanQ) return true;
@@ -154,7 +149,7 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
       });
     }
 
-    return sheetPayments.filter(p => {
+    return filteredTabPayments.filter(p => {
       const member = members.find(m => m.id === p.memberId);
       const name = (p.memberName || '').toLowerCase();
       const reg = String(p.memberRegNo || member?.registrationNo || '').toLowerCase();
@@ -163,12 +158,12 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
 
       return name.includes(q) || reg.includes(q) || method.includes(q) || notes.includes(q);
     });
-  }, [sheetPayments, searchQuery, members]);
+  }, [filteredTabPayments, searchQuery, members]);
 
-  // Subtotal for currently viewed sheet
-  const activeSheetSubtotal = useMemo(() => {
-    return filteredSheetPayments.reduce((sum, p) => sum + p.amount, 0);
-  }, [filteredSheetPayments]);
+  // Subtotal for currently viewed tab
+  const activeTabSubtotal = useMemo(() => {
+    return searchedPayments.reduce((sum, p) => sum + p.amount, 0);
+  }, [searchedPayments]);
 
   const distinctDates = useMemo(() => {
     const dates = Array.from(new Set(payments.map(p => p.date)));
@@ -192,7 +187,7 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
 
   const handleExportCSV = () => {
     const headers = ['Reg No', 'Member Name', 'Payment Method', 'Amount (Rs)', 'Notes', 'Date'];
-    const rows = filteredSheetPayments.map(p => {
+    const rows = searchedPayments.map(p => {
       const { text: reg } = getDisplayRegNo(p);
       return [
         `"${reg}"`,
@@ -208,7 +203,7 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Daily_Ledger_${activeSheet}_${selectedDate}.csv`);
+    link.setAttribute('download', `Daily_Ledger_${activeTab}_${selectedDate}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -219,14 +214,11 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
       {/* Header with Title and Date Picker */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <span>Daily Ledger</span>
-            <span className="text-xs font-semibold px-2.5 py-1 bg-primary/20 text-primary border border-primary/30 rounded-lg">
-              4 Separate Method Sheets
-            </span>
+          <h1 className="text-3xl font-bold">
+            Daily Ledger
           </h1>
           <p className="text-xs text-text-secondary mt-1">
-            Separate cash registers and digital account sheets for exact daily reconciliation
+            Separate cash registers and digital accounts for exact daily reconciliation
           </p>
         </div>
 
@@ -246,33 +238,32 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
             type="button"
             onClick={handleExportCSV}
             className="flex items-center gap-2 px-3.5 py-2 bg-secondary hover:bg-gray-750 text-text-primary rounded-xl border border-gray-700 text-xs font-bold transition-all shadow-sm cursor-pointer"
-            title="Export active sheet to CSV / Excel"
+            title="Export to CSV"
           >
             <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <span>Export Sheet</span>
+            <span>Export CSV</span>
           </button>
         </div>
       </div>
 
-      {/* 4 Interactive Payment Method Cards (Clicking opens that specific sheet) */}
+      {/* 4 Interactive Payment Method Cards (Clicking opens that specific view) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Cash Sheet Card */}
+        {/* Cash Card */}
         <div 
-          onClick={() => setActiveSheet('Cash')}
+          onClick={() => setActiveTab('Cash')}
           className={`p-5 rounded-2xl shadow-lg border transition-all cursor-pointer select-none flex items-center justify-between ${
-            activeSheet === 'Cash'
+            activeTab === 'Cash'
               ? 'border-emerald-400 bg-emerald-950/40 ring-2 ring-emerald-500/50 scale-[1.02]'
               : 'border-emerald-500/30 bg-surface hover:bg-emerald-950/20 hover:border-emerald-500/50'
           }`}
-          title="Click to view Cash Ledger Sheet"
+          title="Click to view Cash ledger"
         >
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm">💵</span>
-              <p className="text-xs font-bold text-emerald-300 uppercase tracking-wider">Cash Sheet</p>
-              {activeSheet === 'Cash' && (
+              <p className="text-xs font-bold text-emerald-300 uppercase tracking-wider">Cash</p>
+              {activeTab === 'Cash' && (
                 <span className="text-[10px] bg-emerald-500 text-black font-black px-1.5 py-0.2 rounded-full">ACTIVE</span>
               )}
             </div>
@@ -288,21 +279,20 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
           </div>
         </div>
 
-        {/* Easypaisa Sheet Card */}
+        {/* Easypaisa Card */}
         <div 
-          onClick={() => setActiveSheet('Easypaisa')}
+          onClick={() => setActiveTab('Easypaisa')}
           className={`p-5 rounded-2xl shadow-lg border transition-all cursor-pointer select-none flex items-center justify-between ${
-            activeSheet === 'Easypaisa'
+            activeTab === 'Easypaisa'
               ? 'border-cyan-400 bg-cyan-950/40 ring-2 ring-cyan-500/50 scale-[1.02]'
               : 'border-cyan-500/30 bg-surface hover:bg-cyan-950/20 hover:border-cyan-500/50'
           }`}
-          title="Click to view Easypaisa Ledger Sheet"
+          title="Click to view Easypaisa ledger"
         >
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm">📱</span>
-              <p className="text-xs font-bold text-cyan-300 uppercase tracking-wider">Easypaisa Sheet</p>
-              {activeSheet === 'Easypaisa' && (
+              <p className="text-xs font-bold text-cyan-300 uppercase tracking-wider">Easypaisa</p>
+              {activeTab === 'Easypaisa' && (
                 <span className="text-[10px] bg-cyan-400 text-black font-black px-1.5 py-0.2 rounded-full">ACTIVE</span>
               )}
             </div>
@@ -318,21 +308,20 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
           </div>
         </div>
 
-        {/* JazzCash Sheet Card */}
+        {/* JazzCash Card */}
         <div 
-          onClick={() => setActiveSheet('JazzCash')}
+          onClick={() => setActiveTab('JazzCash')}
           className={`p-5 rounded-2xl shadow-lg border transition-all cursor-pointer select-none flex items-center justify-between ${
-            activeSheet === 'JazzCash'
+            activeTab === 'JazzCash'
               ? 'border-orange-400 bg-orange-950/40 ring-2 ring-orange-500/50 scale-[1.02]'
               : 'border-orange-500/30 bg-surface hover:bg-orange-950/20 hover:border-orange-500/50'
           }`}
-          title="Click to view JazzCash Ledger Sheet"
+          title="Click to view JazzCash ledger"
         >
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm">⚡</span>
-              <p className="text-xs font-bold text-orange-300 uppercase tracking-wider">JazzCash Sheet</p>
-              {activeSheet === 'JazzCash' && (
+              <p className="text-xs font-bold text-orange-300 uppercase tracking-wider">JazzCash</p>
+              {activeTab === 'JazzCash' && (
                 <span className="text-[10px] bg-orange-400 text-black font-black px-1.5 py-0.2 rounded-full">ACTIVE</span>
               )}
             </div>
@@ -348,21 +337,20 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
           </div>
         </div>
 
-        {/* Bank Transfer Sheet Card */}
+        {/* Bank Transfer Card */}
         <div 
-          onClick={() => setActiveSheet('Bank Transfer')}
+          onClick={() => setActiveTab('Bank Transfer')}
           className={`p-5 rounded-2xl shadow-lg border transition-all cursor-pointer select-none flex items-center justify-between ${
-            activeSheet === 'Bank Transfer'
+            activeTab === 'Bank Transfer'
               ? 'border-purple-400 bg-purple-950/40 ring-2 ring-purple-500/50 scale-[1.02]'
               : 'border-purple-500/30 bg-surface hover:bg-purple-950/20 hover:border-purple-500/50'
           }`}
-          title="Click to view Bank Transfer Ledger Sheet"
+          title="Click to view Bank Transfer ledger"
         >
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm">🏦</span>
-              <p className="text-xs font-bold text-purple-300 uppercase tracking-wider">Bank Transfer Sheet</p>
-              {activeSheet === 'Bank Transfer' && (
+              <p className="text-xs font-bold text-purple-300 uppercase tracking-wider">Bank Transfer</p>
+              {activeTab === 'Bank Transfer' && (
                 <span className="text-[10px] bg-purple-400 text-black font-black px-1.5 py-0.2 rounded-full">ACTIVE</span>
               )}
             </div>
@@ -379,7 +367,7 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
         </div>
       </div>
 
-      {/* Main Grid: Left sidebar dates + Right main sheet area */}
+      {/* Main Grid: Left sidebar dates + Right main table area */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Left column: Daily Total & Date history */}
         <div className="lg:col-span-1 space-y-6">
@@ -428,36 +416,35 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
           </div>
         </div>
 
-        {/* Right column: 4 Separate Method Sheets with dedicated Tabs & Columns */}
+        {/* Right column: Method views with dedicated Tabs & Columns */}
         <div className="lg:col-span-3 space-y-4">
-          {/* Sheet Workbook Tabs (All, Cash, Easypaisa, JazzCash, Bank Transfer) */}
+          {/* Tabs (All, Cash, Easypaisa, JazzCash, Bank Transfer) */}
           <div className="bg-surface p-2 rounded-2xl shadow-lg border border-gray-800">
             <div className="flex flex-wrap items-center gap-1.5">
-              {(['All', 'Cash', 'Easypaisa', 'JazzCash', 'Bank Transfer'] as SheetType[]).map((sheetKey) => {
-                const meta = SHEET_METADATA[sheetKey];
-                const isActive = activeSheet === sheetKey;
-                const count = sheetKey === 'All' 
+              {(['All', 'Cash', 'Easypaisa', 'JazzCash', 'Bank Transfer'] as LedgerMethodTab[]).map((methodKey) => {
+                const meta = TAB_METADATA[methodKey];
+                const isActive = activeTab === methodKey;
+                const count = methodKey === 'All' 
                   ? dailyPayments.length 
-                  : sheetKey === 'Cash' 
+                  : methodKey === 'Cash' 
                     ? dailyBreakdown.cashCount 
-                    : sheetKey === 'Easypaisa' 
+                    : methodKey === 'Easypaisa' 
                       ? dailyBreakdown.easyPaisaCount 
-                      : sheetKey === 'JazzCash' 
+                      : methodKey === 'JazzCash' 
                         ? dailyBreakdown.jazzCashCount 
                         : dailyBreakdown.bankTransferCount;
 
                 return (
                   <button
-                    key={sheetKey}
+                    key={methodKey}
                     type="button"
-                    onClick={() => setActiveSheet(sheetKey)}
+                    onClick={() => setActiveTab(methodKey)}
                     className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs transition-all cursor-pointer border ${
                       isActive 
                         ? `${meta.activeTabClass} border-transparent` 
                         : 'bg-secondary/60 hover:bg-secondary text-text-secondary hover:text-text-primary border-gray-800 font-semibold'
                     }`}
                   >
-                    <span>{meta.icon}</span>
                     <span>{meta.label}</span>
                     <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
                       isActive ? 'bg-black/25 text-white' : 'bg-surface text-gray-300'
@@ -470,37 +457,34 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
             </div>
           </div>
 
-          {/* Active Sheet Card with Dedicated Table */}
+          {/* Active Tab Card with Dedicated Table */}
           <div className="bg-surface rounded-2xl shadow-xl border border-gray-800 overflow-hidden">
-            {/* Sheet Banner */}
+            {/* Header Banner */}
             <div className="p-4 bg-secondary/80 border-b border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">{SHEET_METADATA[activeSheet].icon}</span>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-bold text-lg text-text-primary">
-                      {SHEET_METADATA[activeSheet].label}
-                    </h2>
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${SHEET_METADATA[activeSheet].colorClass}`}>
-                      {SHEET_METADATA[activeSheet].badge}
-                    </span>
-                  </div>
-                  <p className="text-xs text-text-secondary mt-0.5">
-                    {SHEET_METADATA[activeSheet].description} &middot; Date: <span className="font-mono text-text-primary font-bold">{selectedDate}</span>
-                  </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-bold text-lg text-text-primary">
+                    {TAB_METADATA[activeTab].label}
+                  </h2>
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${TAB_METADATA[activeTab].colorClass}`}>
+                    {TAB_METADATA[activeTab].badge}
+                  </span>
                 </div>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  {TAB_METADATA[activeTab].description} &middot; Date: <span className="font-mono text-text-primary font-bold">{selectedDate}</span>
+                </p>
               </div>
 
-              {/* Sheet Subtotal Badge */}
+              {/* Subtotal Badge */}
               <div className="flex items-center gap-2.5 bg-surface px-4 py-2 rounded-xl border border-gray-700 shadow-inner">
-                <span className="text-xs text-text-secondary font-semibold uppercase">Sheet Total:</span>
+                <span className="text-xs text-text-secondary font-semibold uppercase">Total:</span>
                 <span className="text-lg font-black text-emerald-400 font-mono">
-                  <MaskedAmount amount={activeSheetSubtotal} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
+                  <MaskedAmount amount={activeTabSubtotal} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
                 </span>
               </div>
             </div>
 
-            {/* Search Bar for this sheet */}
+            {/* Search Bar */}
             <div className="p-3 sm:p-4 border-b border-gray-800 bg-secondary/20 flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="relative w-full sm:w-[460px]">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
@@ -525,16 +509,16 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
               </div>
 
               <div className="text-xs text-text-secondary w-full sm:w-auto text-right font-mono">
-                Showing <strong className="text-text-primary">{filteredSheetPayments.length}</strong> of <strong className="text-text-primary">{sheetPayments.length}</strong> transactions
+                Showing <strong className="text-text-primary">{searchedPayments.length}</strong> of <strong className="text-text-primary">{filteredTabPayments.length}</strong> transactions
               </div>
             </div>
 
-            {/* The Sheet Table with Explicit "Reg No" Column */}
+            {/* The Table with Explicit "Reg No" Column */}
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead className="bg-gray-800/60 text-text-secondary text-[11px] uppercase tracking-wider font-bold">
                   <tr>
-                    {/* Explicit Reg No Column as requested */}
+                    {/* Explicit Reg No Column */}
                     <th className="p-3.5 pl-4 text-emerald-400 font-extrabold w-28">Reg No</th>
                     <th className="p-3.5">Member Name</th>
                     <th className="p-3.5">Payment Method</th>
@@ -544,7 +528,7 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800/60 text-xs">
-                  {filteredSheetPayments.length > 0 ? filteredSheetPayments.map((p, idx) => {
+                  {searchedPayments.length > 0 ? searchedPayments.map((p, idx) => {
                     const isAccessory = p.type === 'Accessory' || p.memberRegNo === 'ACC';
                     const memberForPayment = members.find(m => m.id === p.memberId);
                     const category = memberForPayment ? memberForPayment.category : 'Strength';
@@ -590,7 +574,7 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
 
                         {/* PAYMENT METHOD COLUMN */}
                         <td className="p-3.5">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${
                             normMethod === 'Cash' 
                               ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                               : normMethod === 'Easypaisa'
@@ -599,9 +583,6 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
                                   ? 'bg-orange-500/15 text-orange-300 border-orange-500/30'
                                   : 'bg-purple-500/15 text-purple-300 border-purple-500/30'
                           }`}>
-                            <span>
-                              {normMethod === 'Cash' ? '💵' : normMethod === 'Easypaisa' ? '📱' : normMethod === 'JazzCash' ? '⚡' : '🏦'}
-                            </span>
                             <span>{p.method}</span>
                           </span>
                         </td>
@@ -634,8 +615,8 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
                     <tr>
                       <td colSpan={6} className="p-12 text-center text-text-secondary italic">
                         {searchQuery.trim() 
-                          ? `No transactions match "${searchQuery}" in ${SHEET_METADATA[activeSheet].label}.` 
-                          : `No transactions recorded under ${SHEET_METADATA[activeSheet].label} for ${selectedDate}.`}
+                          ? `No transactions match "${searchQuery}" in ${TAB_METADATA[activeTab].label}.` 
+                          : `No transactions recorded under ${TAB_METADATA[activeTab].label} for ${selectedDate}.`}
                       </td>
                     </tr>
                   )}
@@ -643,16 +624,16 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
               </table>
             </div>
 
-            {/* Sheet Footer Summary */}
-            {filteredSheetPayments.length > 0 && (
+            {/* Footer Summary */}
+            {searchedPayments.length > 0 && (
               <div className="p-4 bg-secondary/40 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
                 <span className="text-text-secondary">
-                  Showing <strong>{filteredSheetPayments.length}</strong> transactions for <strong>{SHEET_METADATA[activeSheet].label}</strong>
+                  Showing <strong>{searchedPayments.length}</strong> transactions for <strong>{TAB_METADATA[activeTab].label}</strong>
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-text-secondary">Total Collected:</span>
                   <span className="text-base font-black text-emerald-400 font-mono bg-surface px-3 py-1 rounded-lg border border-gray-700">
-                    <MaskedAmount amount={activeSheetSubtotal} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
+                    <MaskedAmount amount={activeTabSubtotal} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
                   </span>
                 </div>
               </div>
