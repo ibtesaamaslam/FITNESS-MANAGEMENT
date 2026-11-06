@@ -224,9 +224,9 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center space-x-2 bg-surface px-3.5 py-2 rounded-xl border border-gray-700 shadow-sm">
+          <div className="flex items-center h-11 space-x-2.5 bg-surface px-3.5 rounded-xl border border-gray-700 shadow-sm">
             <span className="text-text-secondary text-xs font-bold uppercase tracking-wider">Date:</span>
-            <div className="bg-secondary px-2.5 py-1 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors">
+            <div className="bg-secondary px-2.5 py-1.5 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors flex items-center">
               <DateInputDDMMYYYY
                 value={selectedDate}
                 onChange={setSelectedDate}
@@ -238,11 +238,11 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
           <button
             type="button"
             onClick={handleExportCSV}
-            className="flex items-center gap-2 px-3.5 py-2 bg-[#1b3d30] hover:bg-[#234d3d] text-emerald-100 rounded-xl border border-[#2d614d] text-xs font-bold transition-all shadow-md cursor-pointer group"
+            className="flex items-center justify-center gap-2 h-11 px-4 bg-[#10b981] hover:bg-[#059669] text-white rounded-xl border border-[#10b981]/60 text-xs font-bold transition-all shadow-md cursor-pointer group"
             title="Export to CSV"
           >
             <svg 
-              className="w-4 h-4 text-emerald-300 group-hover:translate-y-0.5 transition-transform" 
+              className="w-4 h-4 text-white group-hover:translate-y-0.5 transition-transform" 
               fill="none" 
               viewBox="0 0 24 24" 
               stroke="currentColor"

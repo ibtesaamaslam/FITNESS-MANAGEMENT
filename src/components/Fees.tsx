@@ -461,10 +461,13 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
         {/* Export Button */}
         <button 
           onClick={handleExportCSV} 
-          className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer shrink-0"
+          className="bg-[#10b981] hover:bg-[#059669] text-white font-bold h-11 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 group text-xs border border-[#10b981]/60"
+          title="Export to CSV"
         >
-          <DownloadIcon />
-          <span>Export CSV</span>
+          <svg className="w-4 h-4 text-white group-hover:translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span className="tracking-wide">Export CSV</span>
         </button>
       </div>
 

@@ -893,10 +893,13 @@ export const Staff: React.FC<StaffProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={handleExportCSV}
-            className="bg-secondary hover:bg-gray-700 text-text-primary border border-gray-700 font-semibold px-4 py-2 rounded-lg flex items-center gap-2 transition-all text-sm cursor-pointer shadow"
+            className="bg-[#10b981] hover:bg-[#059669] text-white font-bold h-11 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer group text-xs border border-[#10b981]/60"
+            title="Export to CSV"
           >
-            <DownloadIcon className="h-4 w-4" />
-            <span>Export CSV</span>
+            <svg className="w-4 h-4 text-white group-hover:translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span className="tracking-wide">Export CSV</span>
           </button>
 
           <button
