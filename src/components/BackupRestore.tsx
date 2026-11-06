@@ -17,7 +17,7 @@ import {
 import { ConsistentMemberStar } from './ConsistentMemberStar';
 import { GenderBadge } from './Members';
 import { BackupIcon, DownloadIcon, UploadCloudIcon, RefreshIcon, CloseIcon, LockIcon } from './icons';
-import { isMemberArchived, getLocalDateString } from '../lib/dateUtils';
+import { isMemberArchived, getLocalDateString, formatDateDDMMYYYY } from '../lib/dateUtils';
 
 interface BackupRestoreProps {
   members: Member[];
@@ -1177,7 +1177,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                             <span className="text-[10px] text-text-secondary font-mono">Reg: {p.memberRegNo || 'N/A'}</span>
                           </td>
                           <td className="py-2.5 px-3 text-text-secondary font-mono">
-                            {p.date}
+                            {formatDateDDMMYYYY(p.date)}
                           </td>
                           <td className="py-2.5 px-3">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -1794,7 +1794,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                             {mem && <ConsistentMemberStar member={mem} size="xs" />}
                           </span>
                           <span className="text-[10px] text-text-secondary font-mono">
-                            Reg: {p.memberRegNo || 'N/A'} · Date: {p.date} · Method: {p.method}
+                            Reg: {p.memberRegNo || 'N/A'} · Date: {formatDateDDMMYYYY(p.date)} · Method: {p.method}
                           </span>
                         </div>
                         <span className="font-black text-emerald-400 text-sm">
@@ -1822,7 +1822,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                         <div>
                           <span className="font-bold text-text-primary block">{e.title}</span>
                           <span className="text-[10px] text-text-secondary font-mono">
-                            Category: {e.category} · Date: {e.date}
+                            Category: {e.category} · Date: {formatDateDDMMYYYY(e.date)}
                           </span>
                         </div>
                         <span className="font-black text-red-400 text-sm">
@@ -1937,7 +1937,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                           <div className="text-[10px] text-text-secondary font-mono flex flex-wrap items-center gap-2 mt-0.5">
                             <span>Reg: #{m.registrationNo || 'N/A'}</span>
                             <span>·</span>
-                            <span>Joined: {m.joinDate}</span>
+                            <span>Joined: {formatDateDDMMYYYY(m.joinDate)}</span>
                             {m.phone && (
                               <>
                                 <span>·</span>

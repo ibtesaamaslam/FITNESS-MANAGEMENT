@@ -17,7 +17,7 @@ import {
   StaffIcon,
   BackupIcon
 } from './icons';
-import { getLocalDateString, getLocalMonthString, isMemberArchived } from '../lib/dateUtils';
+import { getLocalDateString, getLocalMonthString, isMemberArchived, formatDateDDMMYYYY } from '../lib/dateUtils';
 import { MaskedAmount } from './MaskedAmount';
 import { GenderBadge } from './Members';
 import { ConsistentMemberStar } from './ConsistentMemberStar';
@@ -72,7 +72,7 @@ const ConfirmPaymentDeleteModal: React.FC<{
                     <h3 className="text-xl font-bold text-text-primary">Delete Payment</h3>
                  </div>
                  <p className="mb-6 text-text-secondary text-sm">
-                    Are you sure you want to delete the payment of <span className="text-text-primary font-bold">Rs {payment.amount}</span> for <span className="text-text-primary font-bold">{payment.memberName}</span> dated {payment.date}?
+                    Are you sure you want to delete the payment of <span className="text-text-primary font-bold">Rs {payment.amount}</span> for <span className="text-text-primary font-bold">{payment.memberName}</span> dated {formatDateDDMMYYYY(payment.date)}?
                  </p>
                  <div className="flex justify-end space-x-3">
                     <button onClick={onClose} className="px-4 py-2 bg-secondary hover:bg-gray-700/50 rounded-xl text-xs font-bold text-text-primary transition-colors">Cancel</button>
@@ -467,7 +467,7 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
                           {member && <GenderBadge gender={member.gender || 'Male'} size="sm" />}
                         </div>
                       </td>
-                      <td className="p-3 text-text-secondary font-mono">{p.date}</td>
+                      <td className="p-3 text-text-secondary font-mono">{formatDateDDMMYYYY(p.date)}</td>
                       <td className="p-3 text-emerald-500 dark:text-emerald-400 font-bold">
                         <MaskedAmount amount={p.amount} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
                       </td>
@@ -528,7 +528,7 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
                           <GenderBadge gender={m.gender || 'Male'} size="sm" />
                         </div>
                       </td>
-                      <td className="p-3 text-red-500 dark:text-red-400 font-mono text-xs font-bold">{m.expiryDate}</td>
+                      <td className="p-3 text-red-500 dark:text-red-400 font-mono text-xs font-bold">{formatDateDDMMYYYY(m.expiryDate)}</td>
                       <td className="p-3 text-text-primary font-semibold">
                         <MaskedAmount amount={m.fee} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
                       </td>

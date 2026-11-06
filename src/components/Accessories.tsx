@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { AccessoryItem, AccessorySale, Member, Payment, Role } from '../types';
 import { MaskedAmount } from './MaskedAmount';
 import { CashIcon, BankIcon, PhonePayIcon, AccessoriesIcon, TrashIcon, CloseIcon } from './icons';
-import { getLocalDateString, isConsistentMember } from '../lib/dateUtils';
+import { getLocalDateString, isConsistentMember, formatDateDDMMYYYY } from '../lib/dateUtils';
 
 interface AccessoriesProps {
   accessories: AccessoryItem[];
@@ -585,7 +585,7 @@ export const Accessories: React.FC<AccessoriesProps> = ({
 
                     return (
                       <tr key={sale.id} className="hover:bg-secondary/30 transition-colors">
-                        <td className="py-3 px-4 font-mono text-text-secondary whitespace-nowrap">{sale.date}</td>
+                        <td className="py-3 px-4 font-mono text-text-secondary whitespace-nowrap">{formatDateDDMMYYYY(sale.date)}</td>
                         <td className="py-3 px-4 font-bold text-text-primary whitespace-nowrap">{sale.accessoryName}</td>
                         <td className="py-3 px-4 text-text-secondary whitespace-nowrap">{sale.buyerName}</td>
                         <td className="py-3 px-4 text-center font-extrabold text-text-primary whitespace-nowrap">{sale.quantity}</td>

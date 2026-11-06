@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Member, Payment, Role } from '../types';
 import { CloseIcon, ReportIcon } from './icons';
-import { getLocalDateString, isMemberArchived, parseLocalDate, isConsistentMember } from '../lib/dateUtils';
+import { getLocalDateString, isMemberArchived, parseLocalDate, isConsistentMember, formatDateDDMMYYYY } from '../lib/dateUtils';
 import { getMemberFeeDetails } from '../lib/feeUtils';
 import { ConsistentMemberStar } from './ConsistentMemberStar';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -1777,7 +1777,7 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
                                         <div className="flex flex-col gap-1">
                                             <div className="flex items-center gap-1.5">
                                                 <span className={`font-mono text-xs ${isExpired ? 'text-rose-400 font-bold' : 'text-text-secondary'}`}>
-                                                    {member.expiryDate}
+                                                    {formatDateDDMMYYYY(member.expiryDate)}
                                                 </span>
                                                 {isExpiringSoon(member.expiryDate, 1) && !isExpired && (
                                                     <span className="px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-yellow-500/20 text-yellow-400" title="Membership is expiring soon!">
@@ -1791,7 +1791,7 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
                                                 )}
                                             </div>
                                             <span className="text-[10px] text-gray-500 font-mono">
-                                                Joined: {member.joinDate}
+                                                Joined: {formatDateDDMMYYYY(member.joinDate)}
                                             </span>
                                         </div>
                                     </td>

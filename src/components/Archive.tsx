@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { Member, Role } from '../types';
 import { TrashIcon } from './icons';
-import { isMemberArchived } from '../lib/dateUtils';
+import { isMemberArchived, formatDateDDMMYYYY } from '../lib/dateUtils';
 import { GenderBadge } from './Members';
 import { ConsistentMemberStar } from './ConsistentMemberStar';
 
@@ -175,10 +175,10 @@ const Archive: React.FC<ArchiveProps> = ({ members, role = 'Admin', onDeleteMemb
                        </div>
                     </td>
                     <td className="p-4 font-mono text-sm">{member.registrationNo}</td>
-                    <td className="p-4 text-sm text-text-secondary">{member.joinDate}</td>
-                    <td className="p-4 text-sm text-red-400 font-medium">{member.expiryDate}</td>
+                    <td className="p-4 text-sm text-text-secondary">{formatDateDDMMYYYY(member.joinDate)}</td>
+                    <td className="p-4 text-sm text-red-400 font-medium">{formatDateDDMMYYYY(member.expiryDate)}</td>
                     <td className="p-4 text-text-secondary text-sm">
-                      {lastPresence}
+                      {lastPresence !== 'Never' ? formatDateDDMMYYYY(lastPresence) : 'Never'}
                     </td>
                     <td className="p-4 text-right">
                       {role === 'Admin' ? (

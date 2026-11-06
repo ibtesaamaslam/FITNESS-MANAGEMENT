@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { StaffMember, StaffRole, StaffCategory, PayrollType, StaffStatus, Member, StaffShift, StaffPayrollRecord, StaffAttendanceLog, Role } from '../types';
 import { MaskedAmount } from './MaskedAmount';
-import { getLocalDateString, getLocalMonthString, parseLocalDate, isConsistentMember } from '../lib/dateUtils';
+import { getLocalDateString, getLocalMonthString, parseLocalDate, isConsistentMember, formatDateDDMMYYYY } from '../lib/dateUtils';
 import { ConsistentMemberStar } from './ConsistentMemberStar';
 import { 
   UsersIcon, 
@@ -2213,19 +2213,19 @@ export const Staff: React.FC<StaffProps> = ({
                   <>
                     {activePayrollAudit.lateLogs.map(l => (
                       <div key={l.id} className="flex items-center justify-between text-amber-400 bg-amber-950/20 px-2 py-0.5 rounded border border-amber-900/40">
-                        <span>🟡 {l.date}: Late Entry</span>
+                        <span>🟡 {formatDateDDMMYYYY(l.date)}: Late Entry</span>
                         <span className="font-mono font-bold">In: {l.checkInTime || 'N/A'} {l.notes ? `(${l.notes})` : ''}</span>
                       </div>
                     ))}
                     {activePayrollAudit.absentLogs.map(l => (
                       <div key={l.id} className="flex items-center justify-between text-red-400 bg-red-950/20 px-2 py-0.5 rounded border border-red-900/40">
-                        <span>🔴 {l.date}: Absent</span>
+                        <span>🔴 {formatDateDDMMYYYY(l.date)}: Absent</span>
                         <span className="font-mono">Unexcused</span>
                       </div>
                     ))}
                     {activePayrollAudit.halfDayLogs.map(l => (
                       <div key={l.id} className="flex items-center justify-between text-blue-400 bg-blue-950/20 px-2 py-0.5 rounded border border-blue-900/40">
-                        <span>🔵 {l.date}: Half Day</span>
+                        <span>🔵 {formatDateDDMMYYYY(l.date)}: Half Day</span>
                         <span className="font-mono">{l.workingHours || 4} hrs shift</span>
                       </div>
                     ))}
@@ -2558,7 +2558,7 @@ export const Staff: React.FC<StaffProps> = ({
               {payslipModalRecord.record.paymentMethod && (
                 <div className="flex justify-between text-[11px] text-gray-400">
                   <span>Paid Via: {payslipModalRecord.record.paymentMethod}</span>
-                  <span>Date: {payslipModalRecord.record.paymentDate || 'N/A'}</span>
+                  <span>Date: {payslipModalRecord.record.paymentDate ? formatDateDDMMYYYY(payslipModalRecord.record.paymentDate) : 'N/A'}</span>
                 </div>
               )}
             </div>
@@ -2591,7 +2591,7 @@ export const Staff: React.FC<StaffProps> = ({
               <div>
                 <h3 className="text-base font-bold text-white">Record Employee Time Sheet</h3>
                 <p className="text-xs text-primary font-medium mt-0.5">
-                  {selectedStaffForAttendance.name} ({selectedStaffForAttendance.role}) — {attendanceDate}
+                  {selectedStaffForAttendance.name} ({selectedStaffForAttendance.role}) — {formatDateDDMMYYYY(attendanceDate)}
                 </p>
               </div>
               <button onClick={() => setIsAttendanceModalOpen(false)} className="text-gray-400 hover:text-white cursor-pointer">
@@ -2824,7 +2824,7 @@ export const Staff: React.FC<StaffProps> = ({
                               const worker = staff.find(s => s.id === log.staffId);
                               return (
                                 <tr key={log.id} className="hover:bg-gray-800/40">
-                                  <td className="py-2.5 px-3 font-mono font-bold text-white">{log.date}</td>
+                                  <td className="py-2.5 px-3 font-mono font-bold text-white">{formatDateDDMMYYYY(log.date)}</td>
                                   <td className="py-2.5 px-3 font-medium text-white">
                                     {log.staffName || worker?.name || 'Worker'}
                                   </td>

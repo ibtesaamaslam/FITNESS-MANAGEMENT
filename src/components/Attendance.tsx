@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { Member, Role, Payment } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getLocalDateString, isMemberArchived, calculateStayDuration } from '../lib/dateUtils';
+import { getLocalDateString, isMemberArchived, calculateStayDuration, formatDateDDMMYYYY } from '../lib/dateUtils';
 import { getMemberFeeDetails } from '../lib/feeUtils';
 import { GenderBadge } from './Members';
 import { CloseIcon, LockIcon } from './icons';
@@ -236,7 +236,7 @@ const Attendance: React.FC<AttendanceProps> = ({
             <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary flex items-center gap-1.5">
               <span>Live Gym Floor Occupancy</span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary text-text-secondary font-normal">
-                {selectedDate}
+                {formatDateDDMMYYYY(selectedDate)}
               </span>
             </h3>
             <p className="text-[11px] text-text-secondary">
@@ -701,7 +701,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                   <span>Entry & Exit Timestamps</span>
                 </h3>
                 <p className="text-xs text-text-secondary mt-0.5">
-                  {editingTimeMember.member.name} (#{editingTimeMember.member.registrationNo}) · {selectedDate}
+                  {editingTimeMember.member.name} (#{editingTimeMember.member.registrationNo}) · {formatDateDDMMYYYY(selectedDate)}
                 </p>
               </div>
               <button

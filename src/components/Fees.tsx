@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Member, Payment, AccessorySale, Role } from '../types';
 import { DownloadIcon, TrashIcon, CloseIcon, CashIcon, BankIcon, PhonePayIcon, AccessoriesIcon, SearchIcon } from './icons';
-import { getLocalDateString, getLocalMonthString, isMemberArchived } from '../lib/dateUtils';
+import { getLocalDateString, getLocalMonthString, isMemberArchived, formatDateDDMMYYYY } from '../lib/dateUtils';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { MaskedAmount } from './MaskedAmount';
 import { GenderBadge } from './Members';
@@ -57,7 +57,7 @@ const ConfirmPaymentDeleteModal: React.FC<{
                     <h3 className="text-xl font-bold text-text-primary">Delete Payment</h3>
                  </div>
                  <p className="mb-6 text-text-secondary">
-                    Are you sure you want to delete the payment of <span className="text-white font-bold">Rs {payment.amount}</span> for <span className="text-white font-bold">{payment.memberName}</span> dated {payment.date}?
+                    Are you sure you want to delete the payment of <span className="text-white font-bold">Rs {payment.amount}</span> for <span className="text-white font-bold">{payment.memberName}</span> dated {formatDateDDMMYYYY(payment.date)}?
                     <br/><br/>
                     <span className="text-xs text-yellow-500 bg-yellow-500/10 p-1 rounded border border-yellow-500/20">Note: This only removes the record from the ledger. It does not automatically change the member's status to "Unpaid".</span>
                  </p>
@@ -672,7 +672,7 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
                           </div>
                         </td>
                         <td className={`p-4 ${isExpired ? 'text-red-400 font-bold' : ''}`}>
-                          {member.expiryDate} {isExpired && "(Expired)"}
+                          {formatDateDDMMYYYY(member.expiryDate)} {isExpired && "(Expired)"}
                         </td>
                         <td className="p-4">
                           <label className="relative inline-flex items-center cursor-pointer">
@@ -840,7 +840,7 @@ const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = '
                       const category = memberForPayment ? memberForPayment.category : 'Strength';
                       return (
                         <tr key={payment.id} className="border-b border-secondary hover:bg-gray-700/50">
-                          <td className="p-4 font-mono text-text-secondary text-xs">{payment.date}</td>
+                          <td className="p-4 font-mono text-text-secondary text-xs">{formatDateDDMMYYYY(payment.date)}</td>
                           <td className="p-4 font-medium">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="flex items-center gap-1.5">

@@ -9,6 +9,42 @@ export const getLocalDateString = (date: Date = new Date()): string => {
 };
 
 /**
+ * Formats any date string (YYYY-MM-DD or Date object) into simple [DD-MM-YYYY] format.
+ * Day always comes first: DD-MM-YYYY.
+ * e.g. "2026-11-05" -> "05-11-2026"
+ */
+export const formatDateDDMMYYYY = (dateInput?: string | Date | null): string => {
+  if (!dateInput) return '—';
+  if (typeof dateInput === 'string') {
+    const trimmed = dateInput.trim();
+    if (!trimmed) return '—';
+    if (/^\d{2}-\d{2}-\d{4}$/.test(trimmed)) {
+      return trimmed;
+    }
+    const ymdMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (ymdMatch) {
+      const year = ymdMatch[1];
+      const month = ymdMatch[2].padStart(2, '0');
+      const day = ymdMatch[3].padStart(2, '0');
+      return `${day}-${month}-${year}`;
+    }
+    const ymdSlash = trimmed.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+    if (ymdSlash) {
+      const year = ymdSlash[1];
+      const month = ymdSlash[2].padStart(2, '0');
+      const day = ymdSlash[3].padStart(2, '0');
+      return `${day}-${month}-${year}`;
+    }
+  }
+  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  if (!d || isNaN(d.getTime())) return String(dateInput);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
+/**
  * Returns the current month in YYYY-MM format based on local time.
  */
 export const getLocalMonthString = (date: Date = new Date()): string => {

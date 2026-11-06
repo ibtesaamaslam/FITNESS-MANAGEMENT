@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Expense, Payment, AccessorySale, Role } from '../types';
 import { TrashIcon, ExpenseIcon, AccessoriesIcon } from './icons';
-import { getLocalDateString, getLocalMonthString } from '../lib/dateUtils';
+import { getLocalDateString, getLocalMonthString, formatDateDDMMYYYY } from '../lib/dateUtils';
 import { MaskedAmount } from './MaskedAmount';
 
 interface MonthlyExpenseProps {
@@ -254,7 +254,7 @@ const MonthlyExpense: React.FC<MonthlyExpenseProps> = ({
                            {expense.category}
                          </span>
                        </td>
-                       <td className="p-4 text-sm text-text-secondary font-mono">{expense.date}</td>
+                       <td className="p-4 text-sm text-text-secondary font-mono">{formatDateDDMMYYYY(expense.date)}</td>
                        <td className="p-4 text-red-400 font-bold font-mono">
                          <MaskedAmount amount={expense.amount} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
                        </td>

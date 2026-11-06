@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Member, Payment } from '../types';
-import { getLocalDateString } from '../lib/dateUtils';
+import { getLocalDateString, formatDateDDMMYYYY } from '../lib/dateUtils';
 import { MaskedAmount } from './MaskedAmount';
 import { CashIcon, BankIcon, PhonePayIcon, SearchIcon, CloseIcon } from './icons';
 import { GenderBadge } from './Members';
@@ -195,7 +195,7 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
         `"${p.method}"`,
         p.amount,
         `"${(p.notes || '').replace(/"/g, '""')}"`,
-        `"${p.date}"`
+        `"${formatDateDDMMYYYY(p.date)}"`
       ];
     });
 
@@ -203,7 +203,7 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Daily_Ledger_${activeTab}_${selectedDate}.csv`);
+    link.setAttribute('download', `Daily_Ledger_${activeTab}_${formatDateDDMMYYYY(selectedDate)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -373,7 +373,7 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-surface p-6 rounded-2xl shadow-lg border border-gray-800">
             <h3 className="text-text-secondary text-xs font-bold mb-1 uppercase tracking-wider">
-              Total Day Income ({selectedDate})
+              Total Day Income ({formatDateDDMMYYYY(selectedDate)})
             </h3>
             <div className="text-3xl font-black text-primary">
               <MaskedAmount amount={dailyTotal} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
@@ -403,7 +403,7 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
                         : 'bg-secondary/70 text-text-secondary hover:bg-secondary hover:text-text-primary border border-gray-800/60'
                     }`}
                   >
-                    <span>{date === getLocalDateString() ? 'Today' : date}</span>
+                    <span>{date === getLocalDateString() ? `Today (${formatDateDDMMYYYY(date)})` : formatDateDDMMYYYY(date)}</span>
                     <span className="font-mono font-semibold">
                       <MaskedAmount amount={daySum} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} showLockIcon={false} />
                     </span>
@@ -471,7 +471,7 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
                   </span>
                 </div>
                 <p className="text-xs text-text-secondary mt-0.5">
-                  {TAB_METADATA[activeTab].description} &middot; Date: <span className="font-mono text-text-primary font-bold">{selectedDate}</span>
+                  {TAB_METADATA[activeTab].description} &middot; Date: <span className="font-mono text-text-primary font-bold">{formatDateDDMMYYYY(selectedDate)}</span>
                 </p>
               </div>
 
@@ -518,8 +518,8 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
               <table className="w-full text-left">
                 <thead className="bg-gray-800/60 text-text-secondary text-[11px] uppercase tracking-wider font-bold">
                   <tr>
-                    {/* Explicit Reg No Column */}
-                    <th className="p-3.5 pl-4 text-emerald-400 font-extrabold w-28">Reg No</th>
+                    {/* Reg No Column with same color/style as Member Name */}
+                    <th className="p-3.5 pl-4 w-28">Reg No</th>
                     <th className="p-3.5">Member Name</th>
                     <th className="p-3.5">Payment Method</th>
                     <th className="p-3.5">Amount (PKR)</th>
@@ -537,13 +537,9 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
 
                     return (
                       <tr key={p.id || idx} className="hover:bg-gray-750/30 transition-colors">
-                        {/* REG NO COLUMN */}
+                        {/* REG NO COLUMN - same color as Member Name */}
                         <td className="p-3.5 pl-4">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg font-mono font-black text-xs border shadow-sm ${
-                            isAcc
-                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                              : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                          }`}>
+                          <span className="font-bold text-text-primary font-mono text-xs">
                             {regText}
                           </span>
                         </td>
@@ -616,7 +612,7 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
                       <td colSpan={6} className="p-12 text-center text-text-secondary italic">
                         {searchQuery.trim() 
                           ? `No transactions match "${searchQuery}" in ${TAB_METADATA[activeTab].label}.` 
-                          : `No transactions recorded under ${TAB_METADATA[activeTab].label} for ${selectedDate}.`}
+                          : `No transactions recorded under ${TAB_METADATA[activeTab].label} for ${formatDateDDMMYYYY(selectedDate)}.`}
                       </td>
                     </tr>
                   )}

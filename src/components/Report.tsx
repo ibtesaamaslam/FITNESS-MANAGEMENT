@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Member, Payment } from '../types';
-import { isMemberArchived, getLocalDateString, calculateStayDuration } from '../lib/dateUtils';
+import { isMemberArchived, getLocalDateString, calculateStayDuration, formatDateDDMMYYYY } from '../lib/dateUtils';
 import { downloadElementAsPdf, printElement } from '../lib/pdfUtils';
 import { GenderBadge } from './Members';
 import { ConsistentMemberStar } from './ConsistentMemberStar';
@@ -267,8 +267,8 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
                         <div><span className="font-semibold text-text-secondary block text-xs">Plan Duration</span> <span className="text-text-primary font-medium">{member.plan}</span></div>
                         <div><span className="font-semibold text-text-secondary block text-xs">Fee Amount</span> <span className="text-text-primary font-mono font-bold">Rs {member.fee.toLocaleString()}</span></div>
                         <div><span className="font-semibold text-text-secondary block text-xs">Fee Status</span> <span className={`font-bold ${member.feePaid ? 'text-green-400' : 'text-red-400'}`}>{member.feePaid ? 'Paid' : 'Unpaid'}</span></div>
-                        <div><span className="font-semibold text-text-secondary block text-xs">Join Date</span> <span className="text-text-primary font-medium">{member.joinDate}</span></div>
-                        <div><span className="font-semibold text-text-secondary block text-xs">Expiry Date</span> <span className="text-text-primary font-medium">{member.expiryDate}</span></div>
+                        <div><span className="font-semibold text-text-secondary block text-xs">Join Date</span> <span className="text-text-primary font-medium">{formatDateDDMMYYYY(member.joinDate)}</span></div>
+                        <div><span className="font-semibold text-text-secondary block text-xs">Expiry Date</span> <span className="text-text-primary font-medium">{formatDateDDMMYYYY(member.expiryDate)}</span></div>
                         <div><span className="font-semibold text-text-secondary block text-xs">Reminders Status</span> <span className="text-text-primary font-medium">{member.remindersEnabled ?? true ? 'Enabled' : 'Disabled'}</span></div>
                     </div>
                 </div>
@@ -287,7 +287,7 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
                             <tbody>
                                 {memberPayments.length > 0 ? memberPayments.map(p => (
                                     <tr key={p.id} className="border-b border-secondary">
-                                        <td className="p-3">{p.date}</td>
+                                        <td className="p-3">{formatDateDDMMYYYY(p.date)}</td>
                                         <td className="p-3">Rs {p.amount.toLocaleString()}</td>
                                         <td className="p-3">{p.method}</td>
                                     </tr>
@@ -624,7 +624,7 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
                                                         {rec.formattedDate}
                                                     </span>
                                                     <span className="text-[10px] text-text-secondary font-mono">
-                                                        {rec.date} · {rec.dayName}
+                                                        {formatDateDDMMYYYY(rec.date)} · {rec.dayName}
                                                     </span>
                                                 </td>
                                                 <td className="p-3">
@@ -820,7 +820,7 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
                                         <div><span className="text-text-secondary print:text-gray-600">Contact:</span> <strong className="text-white print:text-black ml-1">{member.phone || 'N/A'}</strong></div>
                                         <div><span className="text-text-secondary print:text-gray-600">Category:</span> <strong className="text-white print:text-black ml-1">{member.category || 'Strength'}</strong></div>
                                         <div><span className="text-text-secondary print:text-gray-600">Plan:</span> <strong className="text-white print:text-black ml-1">{member.plan}</strong></div>
-                                        <div><span className="text-text-secondary print:text-gray-600">Member Since:</span> <strong className="text-white print:text-black ml-1">{member.joinDate}</strong></div>
+                                        <div><span className="text-text-secondary print:text-gray-600">Member Since:</span> <strong className="text-white print:text-black ml-1">{formatDateDDMMYYYY(member.joinDate)}</strong></div>
                                     </div>
                                 </div>
 
@@ -832,7 +832,7 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
                                             : 'bg-rose-950/20 border-rose-500/40 print:bg-white print:border-black'
                                     }`}>
                                         <div className="flex items-center justify-between font-bold text-[10px] uppercase tracking-wider">
-                                            <span>Specific Inquiry Finding on {inquiryResult.date}:</span>
+                                            <span>Specific Inquiry Finding on {formatDateDDMMYYYY(inquiryResult.date)}:</span>
                                             <span className={`px-1.5 py-0.2 rounded font-mono ${inquiryResult.wasPresent ? 'text-emerald-400 print:text-black' : 'text-rose-400 print:text-black'}`}>
                                                 {inquiryResult.wasPresent ? '✓ PHYSICALLY PRESENT' : '✗ ABSENT / NO LOG'}
                                             </span>
@@ -840,11 +840,11 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
                                         <p className="text-[10px] text-text-secondary print:text-black">
                                             {inquiryResult.wasPresent ? (
                                                 <>
-                                                    Subject <strong>{member.name}</strong> was <strong>PHYSICALLY PRESENT</strong> at Saqib Fitness on <strong>{inquiryResult.date}</strong>. Automated check-in registered entrance at <strong className="text-amber-300 print:text-black font-mono">{inquiryResult.time}</strong> and departure at <strong className="text-blue-300 print:text-black font-mono">{inquiryResult.checkOutTime || 'Active In Gym'}</strong> (Total Workout Stay Duration: <strong className="text-emerald-300 print:text-black font-mono">{inquiryResult.stayDuration}</strong>, {inquiryResult.period} Session).
+                                                    Subject <strong>{member.name}</strong> was <strong>PHYSICALLY PRESENT</strong> at Saqib Fitness on <strong>{formatDateDDMMYYYY(inquiryResult.date)}</strong>. Automated check-in registered entrance at <strong className="text-amber-300 print:text-black font-mono">{inquiryResult.time}</strong> and departure at <strong className="text-blue-300 print:text-black font-mono">{inquiryResult.checkOutTime || 'Active In Gym'}</strong> (Total Workout Stay Duration: <strong className="text-emerald-300 print:text-black font-mono">{inquiryResult.stayDuration}</strong>, {inquiryResult.period} Session).
                                                 </>
                                             ) : (
                                                 <>
-                                                    Computerized records confirm subject <strong>{member.name}</strong> was <strong>NOT PRESENT</strong> on <strong>{inquiryResult.date}</strong>. No entry check-in log was recorded for this calendar date.
+                                                    Computerized records confirm subject <strong>{member.name}</strong> was <strong>NOT PRESENT</strong> on <strong>{formatDateDDMMYYYY(inquiryResult.date)}</strong>. No entry check-in log was recorded for this calendar date.
                                                 </>
                                             )}
                                         </p>
@@ -876,7 +876,7 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
                                             <tbody className="divide-y divide-gray-800 print:divide-gray-300 font-mono">
                                                 {detailedAttendanceRecords.filter(r => r.present).slice(0, 5).map((r) => (
                                                     <tr key={r.date}>
-                                                        <td className="p-1.5 font-bold print:text-black">{r.date}</td>
+                                                        <td className="p-1.5 font-bold print:text-black">{formatDateDDMMYYYY(r.date)}</td>
                                                         <td className="p-1.5 font-sans print:text-black">{r.dayName.slice(0, 3)}</td>
                                                         <td className="p-1.5 font-bold text-amber-300 print:text-black">{r.time}</td>
                                                         <td className="p-1.5 text-blue-300 print:text-black">{r.checkOutTime || 'Active'}</td>
@@ -1137,7 +1137,7 @@ const FacilityPoliceInvestigationLog: React.FC<{
           <div>
             <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
               <Clock className="w-4 h-4 text-indigo-400" />
-              <span>Verified Facility Attendees for {investigationDate} ({filteredAttendees.length} records)</span>
+              <span>Verified Facility Attendees for {formatDateDDMMYYYY(investigationDate)} ({filteredAttendees.length} records)</span>
             </h3>
             <p className="text-xs text-text-secondary">
               Chronological log with exact check-in entrance timestamps saved down to the second.
@@ -1401,7 +1401,7 @@ const FacilityPoliceInvestigationLog: React.FC<{
                   Certified Computerized Entry Logs Generated for Police & Official Inquiries
                 </p>
                 <div className="flex justify-center items-center gap-2 sm:gap-4 text-[9px] font-mono text-gray-400 print:text-black pt-0.5">
-                  <span>AUDIT DATE: <strong>{investigationDate}</strong></span>
+                  <span>AUDIT DATE: <strong>{formatDateDDMMYYYY(investigationDate)}</strong></span>
                   <span>·</span>
                   <span>VERIFIED ATTENDEES: <strong>{checkedInMembers.length}</strong></span>
                   <span>·</span>
@@ -1444,7 +1444,7 @@ const FacilityPoliceInvestigationLog: React.FC<{
 
               <div className="border-t border-gray-700 print:border-black pt-2 space-y-1 text-[9px] leading-snug text-text-secondary print:text-gray-800">
                 <p className="italic">
-                  "I hereby certify under official administrative authority of Saqib Fitness Management that the {checkedInMembers.length} attendance entries and exact check-in/out timestamps above represent authentic computerized logs registered on {investigationDate}. This affidavit is provided for official law enforcement and legal verification."
+                  "I hereby certify under official administrative authority of Saqib Fitness Management that the {checkedInMembers.length} attendance entries and exact check-in/out timestamps above represent authentic computerized logs registered on {formatDateDDMMYYYY(investigationDate)}. This affidavit is provided for official law enforcement and legal verification."
                 </p>
               </div>
 
