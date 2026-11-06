@@ -3,6 +3,7 @@ import { AccessoryItem, AccessorySale, Member, Payment, Role } from '../types';
 import { MaskedAmount } from './MaskedAmount';
 import { CashIcon, BankIcon, PhonePayIcon, AccessoriesIcon, TrashIcon, CloseIcon } from './icons';
 import { getLocalDateString, isConsistentMember, formatDateDDMMYYYY } from '../lib/dateUtils';
+import { DateInputDDMMYYYY } from './DateInputDDMMYYYY';
 
 interface AccessoriesProps {
   accessories: AccessoryItem[];
@@ -790,13 +791,12 @@ export const Accessories: React.FC<AccessoriesProps> = ({
 
                 <div>
                   <label className="block text-xs font-extrabold text-text-secondary uppercase mb-1">Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={sellDate}
-                    onChange={(e) => setSellDate(e.target.value)}
-                    className="w-full bg-secondary py-2 px-3 rounded-lg text-sm font-semibold text-text-primary border border-gray-700 focus:outline-none focus:border-emerald-500"
-                  />
+                  <div className="w-full bg-secondary py-2 px-3 rounded-lg text-sm font-semibold text-text-primary border border-gray-700 focus-within:border-emerald-500">
+                    <DateInputDDMMYYYY
+                      value={sellDate}
+                      onChange={setSellDate}
+                    />
+                  </div>
                 </div>
               </div>
 

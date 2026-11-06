@@ -10,6 +10,7 @@ import { CloseIcon, LockIcon } from './icons';
 import { MaskedAmount } from './MaskedAmount';
 import { ConsistentMemberStar } from './ConsistentMemberStar';
 import { Pencil, Clock, LogOut, CheckCircle2 } from 'lucide-react';
+import { DateInputDDMMYYYY } from './DateInputDDMMYYYY';
 
 interface AttendanceProps {
   members: Member[];
@@ -210,17 +211,15 @@ const Attendance: React.FC<AttendanceProps> = ({
         </div>
 
         {/* Date Selector */}
-        <div className="flex items-center gap-2 bg-surface border border-gray-800 px-4 py-2 rounded-xl shadow">
-          <label htmlFor="attendance-date" className="text-xs font-bold text-text-secondary uppercase tracking-wider whitespace-nowrap">
+        <div className="flex items-center gap-2.5 bg-surface border border-gray-800 px-4 py-2 rounded-xl shadow">
+          <span className="text-xs font-bold text-text-secondary uppercase tracking-wider whitespace-nowrap">
             Selected Date:
-          </label>
-          <input 
-            type="date"
-            id="attendance-date"
+          </span>
+          <DateInputDDMMYYYY
             value={selectedDate}
-            onChange={handleDateChange}
+            onChange={(val) => setSelectedDate(val)}
             max={getLocalDateString()}
-            className="bg-transparent text-sm font-bold text-text-primary outline-none cursor-pointer"
+            id="attendance-date"
           />
         </div>
       </div>

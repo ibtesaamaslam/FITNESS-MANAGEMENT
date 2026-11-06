@@ -5,6 +5,7 @@ import { MaskedAmount } from './MaskedAmount';
 import { CashIcon, BankIcon, PhonePayIcon, SearchIcon, CloseIcon } from './icons';
 import { GenderBadge } from './Members';
 import { ConsistentMemberStar } from './ConsistentMemberStar';
+import { DateInputDDMMYYYY } from './DateInputDDMMYYYY';
 
 interface DailyLedgerProps {
   payments: Payment[];
@@ -223,27 +224,32 @@ const DailyLedger: React.FC<DailyLedgerProps> = ({ payments, members, isUnlocked
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center space-x-2 bg-surface px-3 py-2 rounded-xl border border-gray-700 shadow-sm">
-            <label htmlFor="ledger-date" className="text-text-secondary text-xs font-bold uppercase tracking-wider">Date:</label>
-            <input
-              id="ledger-date"
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-secondary px-2.5 py-1 rounded-lg text-sm font-bold outline-none focus:ring-1 focus:ring-primary border border-gray-700 text-text-primary"
-            />
+          <div className="flex items-center space-x-2 bg-surface px-3.5 py-2 rounded-xl border border-gray-700 shadow-sm">
+            <span className="text-text-secondary text-xs font-bold uppercase tracking-wider">Date:</span>
+            <div className="bg-secondary px-2.5 py-1 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors">
+              <DateInputDDMMYYYY
+                value={selectedDate}
+                onChange={setSelectedDate}
+                id="ledger-date"
+              />
+            </div>
           </div>
 
           <button
             type="button"
             onClick={handleExportCSV}
-            className="flex items-center gap-2 px-3.5 py-2 bg-secondary hover:bg-gray-750 text-text-primary rounded-xl border border-gray-700 text-xs font-bold transition-all shadow-sm cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 bg-[#1b3d30] hover:bg-[#234d3d] text-emerald-100 rounded-xl border border-[#2d614d] text-xs font-bold transition-all shadow-md cursor-pointer group"
             title="Export to CSV"
           >
-            <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <svg 
+              className="w-4 h-4 text-emerald-300 group-hover:translate-y-0.5 transition-transform" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            <span>Export CSV</span>
+            <span className="tracking-wide">Export CSV</span>
           </button>
         </div>
       </div>

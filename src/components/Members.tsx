@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Member, Payment, Role } from '../types';
 import { CloseIcon, ReportIcon } from './icons';
 import { getLocalDateString, isMemberArchived, parseLocalDate, isConsistentMember, formatDateDDMMYYYY } from '../lib/dateUtils';
+import { DateInputDDMMYYYY } from './DateInputDDMMYYYY';
 import { getMemberFeeDetails } from '../lib/feeUtils';
 import { ConsistentMemberStar } from './ConsistentMemberStar';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -317,14 +318,13 @@ const MemberReportModal: React.FC<{
                                 <div className="space-y-3">
                                     <div>
                                         <label htmlFor="meas-date" className="block text-xs font-medium text-text-secondary mb-1">Log Date</label>
-                                        <input 
-                                            id="meas-date"
-                                            type="date" 
-                                            value={mDate} 
-                                            onChange={(e) => setMDate(e.target.value)} 
-                                            className="w-full p-2 bg-secondary border border-gray-800 rounded-lg text-sm text-text-primary focus:outline-none"
-                                            required
-                                        />
+                                        <div className="w-full p-2 bg-secondary border border-gray-800 rounded-lg text-sm text-text-primary">
+                                            <DateInputDDMMYYYY 
+                                                id="meas-date"
+                                                value={mDate} 
+                                                onChange={setMDate} 
+                                            />
+                                        </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
@@ -965,15 +965,11 @@ const MemberModal: React.FC<{
                                 <label className="block text-xs font-semibold text-text-secondary mb-1">
                                     Join Date
                                 </label>
-                                <div className="relative">
-                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                    <input 
-                                        type="date" 
-                                        name="joinDate" 
-                                        value={formData.joinDate || ''} 
-                                        onChange={handleChange} 
-                                        className="w-full pl-9 pr-3 py-2.5 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary focus:outline-none focus:border-primary transition-all cursor-pointer font-mono" 
-                                        required 
+                                <div className="w-full px-3 py-2 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary focus-within:border-primary transition-all cursor-pointer font-mono flex items-center justify-between">
+                                    <DateInputDDMMYYYY
+                                        value={formData.joinDate || ''}
+                                        onChange={(val) => setFormData(prev => ({ ...prev, joinDate: val }))}
+                                        id="member-join-date"
                                     />
                                 </div>
                             </div>
@@ -981,15 +977,8 @@ const MemberModal: React.FC<{
                                 <label className="block text-xs font-semibold text-text-secondary mb-1">
                                     Expiry Date (Calculated)
                                 </label>
-                                <div className="relative">
-                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                                    <input 
-                                        type="date" 
-                                        name="expiryDate" 
-                                        value={formData.expiryDate || ''} 
-                                        className="w-full pl-9 pr-3 py-2.5 bg-secondary/50 border border-gray-800 rounded-xl text-sm text-gray-400 cursor-not-allowed font-mono" 
-                                        readOnly 
-                                    />
+                                <div className="w-full px-3 py-2.5 bg-secondary/50 border border-gray-800 rounded-xl text-sm text-gray-400 font-mono">
+                                    <span>{formData.expiryDate ? formatDateDDMMYYYY(formData.expiryDate) : 'DD-MM-YYYY'}</span>
                                 </div>
                             </div>
                         </div>

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { StaffMember, StaffRole, StaffCategory, PayrollType, StaffStatus, Member, StaffShift, StaffPayrollRecord, StaffAttendanceLog, Role } from '../types';
 import { MaskedAmount } from './MaskedAmount';
 import { getLocalDateString, getLocalMonthString, parseLocalDate, isConsistentMember, formatDateDDMMYYYY } from '../lib/dateUtils';
+import { DateInputDDMMYYYY } from './DateInputDDMMYYYY';
 import { ConsistentMemberStar } from './ConsistentMemberStar';
 import { 
   UsersIcon, 
@@ -1345,13 +1346,10 @@ export const Staff: React.FC<StaffProps> = ({
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface p-4 rounded-2xl border border-gray-800 shadow-lg">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 bg-secondary px-3 py-1.5 rounded-xl border border-gray-700">
-                <CalendarIcon className="h-4 w-4 text-primary" />
                 <span className="text-xs text-gray-400 font-semibold">Attendance Date:</span>
-                <input
-                  type="date"
+                <DateInputDDMMYYYY
                   value={attendanceDate}
-                  onChange={(e) => setAttendanceDate(e.target.value)}
-                  className="bg-transparent text-white text-xs font-bold focus:outline-none cursor-pointer"
+                  onChange={setAttendanceDate}
                 />
               </div>
 
@@ -1959,12 +1957,12 @@ export const Staff: React.FC<StaffProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-gray-300 font-semibold block mb-1">Joining Date</label>
-                  <input
-                    type="date"
-                    value={formData.joinDate || ''}
-                    onChange={(e) => setFormData(p => ({ ...p, joinDate: e.target.value }))}
-                    className="w-full bg-secondary border border-gray-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-primary"
-                  />
+                  <div className="w-full bg-secondary border border-gray-700 rounded-lg p-2.5 text-white focus-within:border-primary">
+                    <DateInputDDMMYYYY
+                      value={formData.joinDate || ''}
+                      onChange={(val) => setFormData(p => ({ ...p, joinDate: val }))}
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -2435,12 +2433,12 @@ export const Staff: React.FC<StaffProps> = ({
 
                 <div>
                   <label className="text-gray-300 font-semibold block mb-1">Payment Date</label>
-                  <input
-                    type="date"
-                    value={payrollForm.paymentDate}
-                    onChange={(e) => setPayrollForm(p => ({ ...p, paymentDate: e.target.value }))}
-                    className="w-full bg-secondary border border-gray-700 rounded-lg p-2 text-white font-mono"
-                  />
+                  <div className="w-full bg-secondary border border-gray-700 rounded-lg p-2 text-white font-mono">
+                    <DateInputDDMMYYYY
+                      value={payrollForm.paymentDate}
+                      onChange={(val) => setPayrollForm(p => ({ ...p, paymentDate: val }))}
+                    />
+                  </div>
                 </div>
               </div>
 

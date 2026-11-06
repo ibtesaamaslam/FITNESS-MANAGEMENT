@@ -6,6 +6,7 @@ import { GenderBadge } from './Members';
 import { ConsistentMemberStar } from './ConsistentMemberStar';
 import { CloseIcon, SearchIcon } from './icons';
 import { ShieldCheck, Clock, Calendar, FileText, CheckCircle2, XCircle, Printer, Copy, Check, ShieldAlert, Search, LogOut, Download, Loader2 } from 'lucide-react';
+import { DateInputDDMMYYYY } from './DateInputDDMMYYYY';
 
 const CATEGORY_COLORS: { [key: string]: string } = {
   'Strength': 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
@@ -371,13 +372,12 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
                             }}
                             className="flex flex-col sm:flex-row items-center gap-2"
                         >
-                            <input
-                                type="date"
+                            <div className="w-full sm:w-60 px-3 py-2 bg-surface border border-gray-700 rounded-xl text-xs font-mono text-white focus-within:border-indigo-500 cursor-pointer">
+                              <DateInputDDMMYYYY
                                 value={inquiryDate}
-                                onChange={(e) => setInquiryDate(e.target.value)}
-                                className="w-full sm:w-60 px-3 py-2 bg-surface border border-gray-700 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
-                                placeholder="YYYY-MM-DD"
-                            />
+                                onChange={setInquiryDate}
+                              />
+                            </div>
                             <div className="flex items-center gap-1.5 w-full sm:w-auto">
                                 <button
                                     type="button"
@@ -1081,12 +1081,12 @@ const FacilityPoliceInvestigationLog: React.FC<{
             <label className="text-xs font-bold text-amber-300 uppercase tracking-wider whitespace-nowrap">
               Investigation Date:
             </label>
-            <input
-              type="date"
-              value={investigationDate}
-              onChange={(e) => setInvestigationDate(e.target.value)}
-              className="w-full sm:w-48 px-3 py-2 bg-surface border border-gray-700 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
-            />
+            <div className="w-full sm:w-48 px-3 py-2 bg-surface border border-gray-700 rounded-xl text-xs font-mono text-white focus-within:border-indigo-500 cursor-pointer">
+              <DateInputDDMMYYYY
+                value={investigationDate}
+                onChange={setInvestigationDate}
+              />
+            </div>
           </div>
           <div className="flex items-center gap-1.5 w-full sm:w-auto">
             <button
