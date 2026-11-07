@@ -1,15 +1,29 @@
 
 
 import React, { useState, useMemo } from 'react';
-import { Member, Role } from '../types';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { getLocalDateString, isMemberArchived } from '../lib/dateUtils';
+import { Member, Role, Payment } from '../types';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { getLocalDateString, isMemberArchived, calculateStayDuration, formatDateDDMMYYYY } from '../lib/dateUtils';
+import { getMemberFeeDetails } from '../lib/feeUtils';
+import { GenderBadge } from './Members';
+import { CloseIcon, LockIcon } from './icons';
+import { MaskedAmount } from './MaskedAmount';
+import { ConsistentMemberStar } from './ConsistentMemberStar';
+import { Pencil, Clock, LogOut, CheckCircle2 } from 'lucide-react';
+import { DateInputDDMMYYYY } from './DateInputDDMMYYYY';
 
 interface AttendanceProps {
   members: Member[];
   role: Role;
-  onUpdateAttendance: (memberId: string, date: string, present: boolean) => void;
+  onUpdateAttendance: (memberId: string, date: string, present: boolean, customTime?: string, customCheckOutTime?: string) => void;
+  onBatchUpdateAttendance?: (memberIds: string[], date: string, present: boolean) => void;
+  onClearAttendanceForDate?: (date: string) => void;
+  onUpdateCheckOut?: (memberId: string, date: string, checkOutTime?: string) => void;
+  onCheckOutAllActive?: (date: string) => void;
   onWarning?: (message: string) => void;
+  onUpdateMember?: (updatedMember: Member, paymentMethod?: Payment['method']) => void;
+  isUnlocked?: boolean;
+  onUnlockRequest?: () => void;
 }
 
 const isExpiringSoon = (expiryDate: string, days: number = 7): boolean => {
@@ -32,35 +46,112 @@ const CATEGORY_COLORS: { [key: string]: string } = {
   'Personal Training': 'bg-purple-500/20 text-purple-400 border border-purple-500/30',
 };
 
-const Attendance: React.FC<AttendanceProps> = ({ members, role, onUpdateAttendance, onWarning }) => {
+const Attendance: React.FC<AttendanceProps> = ({ 
+  members, 
+  role, 
+  onUpdateAttendance, 
+  onBatchUpdateAttendance,
+  onClearAttendanceForDate,
+  onUpdateCheckOut,
+  onCheckOutAllActive,
+  onWarning, 
+  onUpdateMember,
+  isUnlocked = false,
+  onUnlockRequest
+}) => {
   const [selectedDate, setSelectedDate] = useState(getLocalDateString());
   const [searchTerm, setSearchTerm] = useState('');
+  const [genderFilter, setGenderFilter] = useState<'All' | 'Male' | 'Female'>('All');
   const [lastWarnedMemberId, setLastWarnedMemberId] = useState<string | null>(null);
+  const [selectedMemberForDues, setSelectedMemberForDues] = useState<Member | null>(null);
+  const [editingTimeMember, setEditingTimeMember] = useState<{
+    member: Member;
+    checkInTime: string;
+    checkOutTime: string;
+  } | null>(null);
   
   const todayStr = getLocalDateString();
   const isFutureDate = selectedDate > todayStr;
 
-  // Audio Warning removed as per request
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedDate(e.target.value);
   };
   
   const attendanceForDate = useMemo(() => {
-    return members
-      .filter(member => !isMemberArchived(member))
-      .map(member => ({
-        ...member,
-        present: member.attendance[selectedDate] || false,
-      }));
+    return members.map(member => ({
+      ...member,
+      gender: member.gender || 'Male',
+      present: !!member.attendance?.[selectedDate],
+    }));
   }, [members, selectedDate]);
 
+  // Calculations for overall gender stats on selected date
+  const maleAttendance = useMemo(() => attendanceForDate.filter(m => m.gender === 'Male'), [attendanceForDate]);
+  const femaleAttendance = useMemo(() => attendanceForDate.filter(m => m.gender === 'Female'), [attendanceForDate]);
+
+  const malePresentCount = maleAttendance.filter(m => m.present).length;
+  const maleAbsentCount = maleAttendance.length - malePresentCount;
+
+  const femalePresentCount = femaleAttendance.filter(m => m.present).length;
+  const femaleAbsentCount = femaleAttendance.length - femalePresentCount;
+
   const filteredMembers = useMemo(() => {
-    const results = attendanceForDate.filter(member => 
-        member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.registrationNo.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    return results;
-  }, [attendanceForDate, searchTerm]);
+    const rawTrimmed = searchTerm.trim();
+    if (!rawTrimmed) {
+      return attendanceForDate.filter(member => {
+        return genderFilter === 'All' || member.gender === genderFilter;
+      });
+    }
+
+    const query = rawTrimmed.toLowerCase();
+    const isPureNumeric = /^#?\d+$/.test(query);
+    const queryDigits = query.replace(/\D/g, '');
+    const queryNum = queryDigits !== '' ? parseInt(queryDigits, 10) : NaN;
+
+    const meetsGender = (member: { gender?: string }) => {
+      return genderFilter === 'All' || member.gender === genderFilter;
+    };
+
+    const matchesExactReg = (regNo?: string) => {
+      if (!regNo) return false;
+      const reg = regNo.trim().toLowerCase();
+      const regClean = reg.replace(/^#/, '');
+      const queryClean = query.replace(/^#/, '');
+      if (reg === query || regClean === queryClean) return true;
+
+      const regDigits = reg.replace(/\D/g, '');
+      if (!isNaN(queryNum) && regDigits !== '') {
+        const rNum = parseInt(regDigits, 10);
+        if (!isNaN(rNum) && rNum === queryNum) return true;
+      }
+      return false;
+    };
+
+    if (isPureNumeric) {
+      const exactMatches = attendanceForDate.filter(m => matchesExactReg(m.registrationNo));
+      if (exactMatches.length > 0) {
+        return exactMatches.filter(meetsGender);
+      }
+
+      if (queryDigits.length >= 10) {
+        const phoneMatches = attendanceForDate.filter(m => {
+          const cleanPhone = (m.phone || '').replace(/\D/g, '');
+          return cleanPhone === queryDigits;
+        });
+        return phoneMatches.filter(meetsGender);
+      }
+
+      return [];
+    }
+
+    return attendanceForDate.filter(member => {
+      if (!meetsGender(member)) return false;
+      return (
+        member.name.toLowerCase().includes(query) ||
+        member.registrationNo.toLowerCase().includes(query)
+      );
+    });
+  }, [attendanceForDate, genderFilter, searchTerm]);
 
   // Check for expired members in search results to show warning
   React.useEffect(() => {
@@ -98,139 +189,377 @@ const Attendance: React.FC<AttendanceProps> = ({ members, role, onUpdateAttendan
   
   const totalPresent = filteredMembers.filter(m => m.present).length;
   const totalAbsent = filteredMembers.length - totalPresent;
-  
-  // For member view
-  const loggedInMember = members[0]; // Simulating logged in member
-  const memberAttendanceData = useMemo(() => {
-    if (!loggedInMember) return [];
-    return Object.entries(loggedInMember.attendance)
-      .sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime())
-      .slice(-30) // Last 30 days
-      .map(([date, present]) => ({
-        date: new Date(date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric'}),
-        status: present ? 1 : 0,
-      }));
-  }, [loggedInMember]);
 
-  if (role === 'Member') {
-    if (!loggedInMember) {
-        return (
-             <div className="p-4 md:p-8">
-                <h1 className="text-3xl font-bold mb-6">My Attendance</h1>
-                <div className="bg-surface p-6 rounded-lg shadow-lg text-center">
-                    <p className="text-text-secondary">No member data available.</p>
-                </div>
-            </div>
-        );
+  const handleMarkAllFiltered = (presentState: boolean) => {
+    const count = filteredMembers.length;
+    if (count === 0) return;
+
+    if (presentState) {
+      const confirmed = window.confirm(
+        `⚠️ ATTENDANCE CONFIRMATION:\n\nAre you sure you want to mark ALL ${count} visible members as PRESENT for ${formatDateDDMMYYYY(selectedDate)}?\n\n• In standard gym operations, members check in individually as they enter.\n• Only proceed if all ${count} members are actually attending.`
+      );
+      if (!confirmed) return;
+
+      if (onBatchUpdateAttendance) {
+        onBatchUpdateAttendance(filteredMembers.map(m => m.id), selectedDate, true);
+      } else {
+        filteredMembers.forEach(member => {
+          if (!member.present) {
+            onUpdateAttendance(member.id, selectedDate, true);
+          }
+        });
+      }
+    } else {
+      const confirmed = window.confirm(
+        `⚠️ RESET ATTENDANCE TO ABSENT:\n\nAre you sure you want to mark all ${count} visible members as ABSENT for ${formatDateDDMMYYYY(selectedDate)}?\n\nThis will clear check-in and check-out logs for this date.`
+      );
+      if (!confirmed) return;
+
+      if (genderFilter === 'All' && !searchTerm.trim() && onClearAttendanceForDate) {
+        onClearAttendanceForDate(selectedDate);
+      } else if (onBatchUpdateAttendance) {
+        onBatchUpdateAttendance(filteredMembers.map(m => m.id), selectedDate, false);
+      } else {
+        filteredMembers.forEach(member => {
+          if (member.present) {
+            onUpdateAttendance(member.id, selectedDate, false);
+          }
+        });
+      }
     }
-    return (
-      <div className="p-4 md:p-8">
-        <h1 className="text-3xl font-bold mb-6">My Attendance</h1>
-        <div className="bg-surface p-6 rounded-lg shadow-lg">
-          <h2 className="text-xl font-semibold mb-4 text-text-primary">Last 30 Days</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={memberAttendanceData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#4B5563" />
-              <XAxis dataKey="date" stroke="#9CA3AF" />
-              <YAxis tickFormatter={(value) => value === 1 ? 'Present' : 'Absent'} ticks={[0, 1]} stroke="#9CA3AF" />
-              <Tooltip formatter={(value) => value === 1 ? 'Present' : 'Absent'} contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #4B5563' }} />
-              <Bar dataKey="status" fill="#10B981" name="Attendance" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    );
-  }
+  };
+
+  const activeInsideMembers = useMemo(() => {
+    return filteredMembers.filter(m => m.present && !m.checkOutTimes?.[selectedDate]);
+  }, [filteredMembers, selectedDate]);
+
+  const checkedOutMembers = useMemo(() => {
+    return filteredMembers.filter(m => m.present && !!m.checkOutTimes?.[selectedDate]);
+  }, [filteredMembers, selectedDate]);
 
   return (
-    <div className="p-4 md:p-8">
-      <h1 className="text-3xl font-bold mb-6">Attendance Register</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="md:col-span-2 bg-surface p-6 rounded-lg shadow-lg flex flex-wrap items-center gap-4">
-          <div className="flex items-center space-x-2">
-            <label htmlFor="attendance-date" className="font-semibold text-sm">Date:</label>
-            <input 
-              type="date"
-              id="attendance-date"
-              value={selectedDate}
-              onChange={handleDateChange}
-              max={getLocalDateString()} // Can't select future dates
-              className="p-2 bg-secondary rounded-lg"
-            />
+    <div className="p-4 md:p-8 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-text-primary">Attendance Register</h1>
+          <p className="text-sm text-text-secondary mt-1">Track daily check-ins, check-outs, and live gym floor occupancy</p>
+        </div>
+
+        {/* Date Selector */}
+        <div className="flex items-center gap-2.5 bg-surface border border-gray-800 px-4 py-2 rounded-xl shadow">
+          <span className="text-xs font-bold text-text-secondary uppercase tracking-wider whitespace-nowrap">
+            Selected Date:
+          </span>
+          <DateInputDDMMYYYY
+            value={selectedDate}
+            onChange={(val) => setSelectedDate(val)}
+            max={getLocalDateString()}
+            id="attendance-date"
+          />
+        </div>
+      </div>
+
+      {/* Alert banner if 100% of members are marked present (helps gym owner easily reset) */}
+      {attendanceForDate.length > 0 && attendanceForDate.every(m => m.present) && !isFutureDate && (
+        <div className="bg-amber-500/15 border-2 border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <p className="text-sm font-bold text-amber-300">
+                Notice: All {attendanceForDate.length} members are currently marked as PRESENT for {formatDateDDMMYYYY(selectedDate)}.
+              </p>
+              <p className="text-xs text-text-secondary mt-0.5">
+                If all members were marked present by mistake before closing gym, click "Reset All to Absent" to clear today's attendance.
+              </p>
+            </div>
           </div>
-          <div className="flex-grow">
-            <input
-                type="text"
-                placeholder="Search member by name or ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="p-2 bg-secondary rounded-lg w-full"
-            />
+          <button
+            type="button"
+            onClick={() => handleMarkAllFiltered(false)}
+            className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs transition-all shadow-md cursor-pointer shrink-0"
+          >
+            ✕ Reset All to Absent
+          </button>
+        </div>
+      )}
+      
+      {/* Real-Time Facility Occupancy Strip */}
+      <div className="bg-surface border border-gray-800 rounded-2xl p-4 shadow-lg flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="relative flex h-3.5 w-3.5">
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${activeInsideMembers.length > 0 ? 'bg-emerald-400 opacity-75' : 'bg-gray-500 opacity-20'}`}></span>
+            <span className={`relative inline-flex rounded-full h-3.5 w-3.5 ${activeInsideMembers.length > 0 ? 'bg-emerald-500' : 'bg-gray-600'}`}></span>
+          </span>
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary flex items-center gap-1.5">
+              <span>Live Gym Floor Occupancy</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary text-text-secondary font-normal">
+                {formatDateDDMMYYYY(selectedDate)}
+              </span>
+            </h3>
+            <p className="text-[11px] text-text-secondary">
+              Members currently active in workout sessions vs departed
+            </p>
           </div>
         </div>
-        <div className="bg-surface p-6 rounded-lg shadow-lg">
-          <h3 className="font-bold text-lg mb-2">Summary for {selectedDate}</h3>
-          <div className="space-y-4">
-            <div className="flex justify-around">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-green-400">{totalPresent}</p>
-                <p className="text-text-secondary text-xs uppercase font-semibold">Present</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-red-400">{totalAbsent}</p>
-                <p className="text-text-secondary text-xs uppercase font-semibold">Absent</p>
-              </div>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <span className="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
+              <span>🏋️‍♂️</span>
+              <span>{activeInsideMembers.length} Active on Floor</span>
+            </span>
+            <span className="px-3 py-1.5 rounded-xl bg-blue-500/15 text-blue-400 font-bold border border-blue-500/30 flex items-center gap-1.5 shadow-sm">
+              <span>🚪</span>
+              <span>{checkedOutMembers.length} Checked Out</span>
+            </span>
+          </div>
+
+          {activeInsideMembers.length > 0 && onCheckOutAllActive && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(`Log check-out for all ${activeInsideMembers.length} active members on the gym floor?`)) {
+                  onCheckOutAllActive(selectedDate);
+                }
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow cursor-pointer"
+              title="Click to check out all members currently inside"
+            >
+              <span>🚪</span>
+              <span>Check Out All ({activeInsideMembers.length})</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Gender Segregated Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Total Attendance Stat Card */}
+        <div 
+          onClick={() => setGenderFilter('All')}
+          className={`p-4 rounded-xl border transition-all cursor-pointer ${
+            genderFilter === 'All'
+              ? 'bg-teal-500/15 border-teal-500/50 shadow-md ring-2 ring-teal-500/30'
+              : 'bg-surface border-gray-800 hover:border-gray-700'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">Overall Attendance</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-text-secondary font-mono">
+              {attendanceForDate.length} Total
+            </span>
+          </div>
+          <div className="flex items-baseline space-x-3 mt-2">
+            <div className="text-2xl font-black text-emerald-400 font-mono">
+              {attendanceForDate.filter(m => m.present).length} <span className="text-xs font-semibold text-emerald-300">Present</span>
             </div>
-            
-            <div className="pt-4 border-t border-gray-700">
-               <div className="flex justify-between items-center text-xs mb-1">
-                 <span className="text-text-secondary uppercase">Fee Payment Status</span>
-                 <span className="font-mono text-primary font-bold">
-                   {filteredMembers.filter(m => m.feePaid).length}/{filteredMembers.length}
-                 </span>
-               </div>
-               <div className="w-full bg-gray-700 h-1.5 rounded-full overflow-hidden">
-                 <div 
-                   className="bg-primary h-full transition-all duration-500" 
-                   style={{ width: `${(filteredMembers.filter(m => m.feePaid).length / filteredMembers.length) * 100}%` }}
-                 />
-               </div>
+            <span className="text-gray-600">/</span>
+            <div className="text-xl font-bold text-red-400 font-mono">
+              {attendanceForDate.filter(m => !m.present).length} <span className="text-xs font-semibold text-red-300">Absent</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Male Attendance Stat Card */}
+        <div 
+          onClick={() => setGenderFilter('Male')}
+          className={`p-4 rounded-xl border transition-all cursor-pointer ${
+            genderFilter === 'Male'
+              ? 'bg-blue-500/20 border-blue-500 shadow-md ring-2 ring-blue-500/40'
+              : 'bg-surface border-gray-800 hover:border-blue-500/30'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
+              <span>♂</span> Male Shift / Attendance
+            </span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-mono">
+              {maleAttendance.length} Total
+            </span>
+          </div>
+          <div className="flex items-baseline space-x-3 mt-2">
+            <div className="text-2xl font-black text-blue-400 font-mono">
+              {malePresentCount} <span className="text-xs font-semibold text-blue-300">Present</span>
+            </div>
+            <span className="text-gray-600">/</span>
+            <div className="text-xl font-bold text-red-400/80 font-mono">
+              {maleAbsentCount} <span className="text-xs font-semibold text-red-300/80">Absent</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Female Attendance Stat Card */}
+        <div 
+          onClick={() => setGenderFilter('Female')}
+          className={`p-4 rounded-xl border transition-all cursor-pointer ${
+            genderFilter === 'Female'
+              ? 'bg-pink-500/20 border-pink-500 shadow-md ring-2 ring-pink-500/40'
+              : 'bg-surface border-gray-800 hover:border-pink-500/30'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-pink-400 uppercase tracking-wider flex items-center gap-1">
+              <span>♀</span> Female Shift / Attendance
+            </span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 font-mono">
+              {femaleAttendance.length} Total
+            </span>
+          </div>
+          <div className="flex items-baseline space-x-3 mt-2">
+            <div className="text-2xl font-black text-pink-400 font-mono">
+              {femalePresentCount} <span className="text-xs font-semibold text-pink-300">Present</span>
+            </div>
+            <span className="text-gray-600">/</span>
+            <div className="text-xl font-bold text-red-400/80 font-mono">
+              {femaleAbsentCount} <span className="text-xs font-semibold text-red-300/80">Absent</span>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Toolbar: Search, Gender Tabs & Quick Batch Actions */}
+      <div className="bg-surface border border-gray-800 rounded-2xl p-3.5 shadow-lg flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        {/* Search & Gender Tabs */}
+        <div className="flex flex-wrap items-center gap-3 flex-1">
+          <div className="relative min-w-[240px] max-w-sm flex-1">
+            <input
+              type="text"
+              placeholder="Search member by name or Reg No..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-secondary border border-gray-700/80 rounded-xl text-sm font-medium text-text-primary placeholder-gray-500 outline-none focus:border-emerald-500 transition-all"
+            />
+            <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+
+          {/* Gender Filter Buttons */}
+          <div className="flex items-center bg-secondary/80 p-1 rounded-xl border border-gray-700/80 shrink-0">
+            <button
+              onClick={() => setGenderFilter('All')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                genderFilter === 'All'
+                  ? 'bg-primary text-white shadow'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              All ({attendanceForDate.length})
+            </button>
+            <button
+              onClick={() => setGenderFilter('Male')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                genderFilter === 'Male'
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'text-text-secondary hover:text-blue-400'
+              }`}
+            >
+              <span>♂</span> Male ({maleAttendance.length})
+            </button>
+            <button
+              onClick={() => setGenderFilter('Female')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                genderFilter === 'Female'
+                  ? 'bg-pink-600 text-white shadow'
+                  : 'text-text-secondary hover:text-pink-400'
+              }`}
+            >
+              <span>♀</span> Female ({femaleAttendance.length})
+            </button>
+          </div>
+        </div>
+
+        {/* Batch Actions & Summary */}
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          {!isFutureDate && (
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => handleMarkAllFiltered(true)}
+                className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                title={`Mark all ${genderFilter === 'All' ? '' : genderFilter} visible members as present`}
+              >
+                ✓ Mark All Present
+              </button>
+              <button
+                onClick={() => handleMarkAllFiltered(false)}
+                className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                title={`Mark all ${genderFilter === 'All' ? '' : genderFilter} visible members as absent`}
+              >
+                ✕ Clear All
+              </button>
+            </div>
+          )}
+
+          {/* Fee & Dues Payment Status */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary/80 border border-gray-700/80 rounded-xl">
+              <span className="text-xs text-text-secondary uppercase font-semibold">Fees:</span>
+              <span className="text-xs font-bold text-emerald-400 font-mono">
+                {filteredMembers.filter(m => getMemberFeeDetails(m).isFullyPaid).length}/{filteredMembers.length} Paid
+              </span>
+            </div>
+
+            {(() => {
+              const totalDues = filteredMembers.reduce((acc, m) => acc + getMemberFeeDetails(m).dueAmount, 0);
+              const membersWithDues = filteredMembers.filter(m => getMemberFeeDetails(m).dueAmount > 0).length;
+              if (totalDues <= 0) return null;
+              return (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/15 border border-amber-500/30 rounded-xl" title={`${membersWithDues} members have pending balance`}>
+                  <span className="text-xs text-amber-300 uppercase font-semibold">Total Dues:</span>
+                  <span className="text-xs font-bold text-amber-400 font-mono">
+                    Rs {totalDues.toLocaleString()}
+                  </span>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      </div>
       
-      <div className="bg-surface rounded-lg shadow-lg overflow-hidden">
+      {/* Attendance Register Table */}
+      <div className="bg-surface rounded-xl shadow-lg border border-gray-800 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-secondary">
+            <thead className="bg-secondary text-text-secondary text-xs uppercase tracking-wider">
               <tr>
-                <th className="p-4">Member</th>
+                <th className="p-4">Member Info</th>
+                <th className="p-4">Gender</th>
                 <th className="p-4">Fee Status</th>
-                <th className="p-4">Status</th>
+                <th className="p-4">Balance / Dues</th>
+                <th className="p-4">Attendance, In/Out Times & Stay Duration</th>
                 <th className="p-4 text-center">Mark Attendance</th>
               </tr>
             </thead>
             <tbody>
               {isFutureDate ? (
                 <tr>
-                    <td colSpan={4} className="text-center p-8 text-text-secondary">Cannot mark attendance for a future date.</td>
+                    <td colSpan={6} className="text-center p-8 text-text-secondary">Cannot mark attendance for a future date.</td>
+                </tr>
+              ) : filteredMembers.length === 0 ? (
+                <tr>
+                    <td colSpan={6} className="text-center p-8 text-text-secondary italic">No members found matching the selected filters.</td>
                 </tr>
               ) : filteredMembers.map(member => {
                 const todayStr = getLocalDateString();
                 const isExpired = new Date(member.expiryDate) < new Date(todayStr);
+                const feeDetails = getMemberFeeDetails(member);
+                const isCheckedOut = Boolean(member.checkOutTimes?.[selectedDate]);
+                // When checked out or present, row is completely normal (no red background tint, no red left border)
+                const showExpiredRowHighlight = isExpired && !isCheckedOut && !member.present;
                 return (
-                <tr key={member.id} className={`border-b border-secondary hover:bg-gray-700/50 ${isExpired ? 'bg-red-900/40 border-l-4 border-l-red-500' : ''}`}>
-                  <td className="p-4 font-medium flex items-center space-x-3">
-                    <img src={member.photo} alt={member.name} className="h-10 w-10 rounded-full object-cover"/>
+                <tr key={member.id} className={`border-b border-secondary hover:bg-gray-700/50 transition-colors ${showExpiredRowHighlight ? 'bg-red-900/30 border-l-4 border-l-red-500' : ''}`}>
+                  <td className="p-4 font-medium">
                     <div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className={isExpired ? 'text-red-400' : ''}>{member.name}</span>
+                            <span className={`font-semibold flex items-center gap-1.5 ${showExpiredRowHighlight ? 'text-red-400 font-bold' : 'text-text-primary'}`}>
+                                <span>{member.name}</span>
+                                <ConsistentMemberStar member={member} size="sm" />
+                            </span>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${CATEGORY_COLORS[member.category || 'Strength'] || 'bg-gray-500/20 text-gray-400'}`}>
                                 {member.category || 'Strength'}
                             </span>
-                            {isExpiringSoon(member.expiryDate, 1) && (
+                            {isExpiringSoon(member.expiryDate, 1) && !isCheckedOut && (
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${isExpired ? 'bg-red-500 text-white' : 'bg-yellow-500/20 text-yellow-400'}`} title="Membership is expiring soon!">
                                     {isExpired ? 'Expired' : 'Expiring'}
                                 </span>
@@ -240,14 +569,154 @@ const Attendance: React.FC<AttendanceProps> = ({ members, role, onUpdateAttendan
                     </div>
                   </td>
                   <td className="p-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${member.feePaid ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
-                      {member.feePaid ? 'Paid' : 'Unpaid'}
+                    <GenderBadge gender={member.gender || 'Male'} size="sm" />
+                  </td>
+                  <td className="p-4">
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                      feeDetails.isFullyPaid 
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                        : feeDetails.isPartial 
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+                          : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                    }`}>
+                      {feeDetails.isFullyPaid ? 'Paid' : feeDetails.isPartial ? 'Partial' : 'Unpaid'}
                     </span>
                   </td>
                   <td className="p-4">
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${member.present ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                      {member.present ? 'Present' : 'Absent'}
-                    </span>
+                    {feeDetails.dueAmount === 0 ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span>Rs 0</span>
+                        </span>
+                        {onUpdateMember && (
+                          <button
+                            onClick={() => setSelectedMemberForDues(member)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-emerald-400 hover:bg-gray-800/80 transition-all cursor-pointer"
+                            title="Adjust fee or payment details"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div 
+                          onClick={() => onUpdateMember && setSelectedMemberForDues(member)}
+                          className={`cursor-pointer inline-flex flex-col items-start px-2.5 py-1 rounded-xl text-xs font-mono border transition-all hover:scale-[1.02] ${
+                            feeDetails.isPartial 
+                              ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/40 shadow-sm' 
+                              : 'bg-red-500/15 hover:bg-red-500/25 text-red-300 border-red-500/40 shadow-sm'
+                          }`}
+                          title="Click to update payment or clear balance"
+                        >
+                          <div className="flex items-center gap-1 font-bold">
+                            <span className="text-[11px] font-sans text-text-secondary uppercase">Due:</span>
+                            <span className="text-sm font-black text-white font-mono">
+                              Rs {feeDetails.dueAmount.toLocaleString()}
+                            </span>
+                          </div>
+                          {feeDetails.isPartial && (
+                            <span className="text-[10px] text-amber-400/90 font-sans flex items-center gap-1 font-mono">
+                              Paid: Rs {feeDetails.paidAmount.toLocaleString()} / Rs {feeDetails.fee.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                        {onUpdateMember && (
+                          <button
+                            onClick={() => setSelectedMemberForDues(member)}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1"
+                            title="Collect dues or record payment"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            <span>Collect</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    <div className="flex flex-col items-start gap-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${member.present ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+                          {member.present ? 'Present' : 'Absent'}
+                        </span>
+                        {member.present && (
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 border ${
+                            member.checkOutTimes?.[selectedDate]
+                              ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                              : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 animate-pulse'
+                          }`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                            <span>{member.checkOutTimes?.[selectedDate] ? 'Departed' : 'On Gym Floor'}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {member.present && (
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs pt-0.5">
+                          {/* Entry / Check-In Time */}
+                          <button
+                            type="button"
+                            onClick={() => setEditingTimeMember({
+                              member,
+                              checkInTime: member.checkInTimes?.[selectedDate] || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }),
+                              checkOutTime: member.checkOutTimes?.[selectedDate] || ''
+                            })}
+                            className="text-[11px] font-mono text-amber-300 font-semibold flex items-center gap-1 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-lg border border-amber-500/25 transition-all cursor-pointer"
+                            title="Click to view or edit Entry Time"
+                          >
+                            <span>⏱️ In:</span>
+                            <span>{member.checkInTimes?.[selectedDate] || 'Logged'}</span>
+                            <Pencil className="w-2.5 h-2.5 opacity-50 ml-0.5" />
+                          </button>
+
+                          {/* Exit / Check-Out Time or 1-Click Check Out Button */}
+                          {member.checkOutTimes?.[selectedDate] ? (
+                            <button
+                              type="button"
+                              onClick={() => setEditingTimeMember({
+                                member,
+                                checkInTime: member.checkInTimes?.[selectedDate] || '06:30:00 PM',
+                                checkOutTime: member.checkOutTimes?.[selectedDate] || ''
+                              })}
+                              className="text-[11px] font-mono text-blue-300 font-semibold flex items-center gap-1 bg-blue-500/10 hover:bg-blue-500/20 px-2 py-0.5 rounded-lg border border-blue-500/25 transition-all cursor-pointer"
+                              title="Click to view or edit Departure Time"
+                            >
+                              <span>🚪 Out:</span>
+                              <span>{member.checkOutTimes[selectedDate]}</span>
+                              <Pencil className="w-2.5 h-2.5 opacity-50 ml-0.5" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+                                if (onUpdateCheckOut) {
+                                  onUpdateCheckOut(member.id, selectedDate, now);
+                                } else {
+                                  onUpdateAttendance(member.id, selectedDate, true, undefined, now);
+                                }
+                              }}
+                              className="text-[11px] font-bold text-white flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 px-2.5 py-0.5 rounded-lg border border-emerald-400 transition-all cursor-pointer shadow-sm"
+                              title="1-Click: Log Member Departure/Check-Out Now"
+                            >
+                              <span>🚪</span>
+                              <span>Check Out</span>
+                            </button>
+                          )}
+
+                          {/* Total Stay Duration Tag */}
+                          {member.checkInTimes?.[selectedDate] && (
+                            <span className="text-[10px] font-mono text-gray-300 bg-secondary/80 px-2 py-0.5 rounded-md border border-gray-700" title="Total facility workout duration">
+                              ⏳ {calculateStayDuration(member.checkInTimes[selectedDate], member.checkOutTimes?.[selectedDate])}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className="p-4 text-center">
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -265,6 +734,371 @@ const Attendance: React.FC<AttendanceProps> = ({ members, role, onUpdateAttendan
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Quick Dues Settlement Modal */}
+      {selectedMemberForDues && onUpdateMember && (
+        <QuickDuesModal
+          member={selectedMemberForDues}
+          onClose={() => setSelectedMemberForDues(null)}
+          onSave={(updatedMember, paymentMethod) => {
+            onUpdateMember(updatedMember, paymentMethod);
+            setSelectedMemberForDues(null);
+          }}
+        />
+      )}
+
+      {/* Modal: Edit Check-in & Check-out Timestamps */}
+      {editingTimeMember && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-surface border border-gray-700 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-800">
+              <div>
+                <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+                  <span>⏱️</span>
+                  <span>Entry & Exit Timestamps</span>
+                </h3>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  {editingTimeMember.member.name} (#{editingTimeMember.member.registrationNo}) · {formatDateDDMMYYYY(selectedDate)}
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingTimeMember(null)}
+                className="p-1 rounded-lg text-text-secondary hover:text-text-primary hover:bg-secondary cursor-pointer"
+              >
+                <CloseIcon className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Check-In Field */}
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-amber-300">
+                  Entrance / Check-In Time
+                </label>
+                <input
+                  type="text"
+                  value={editingTimeMember.checkInTime}
+                  onChange={(e) => setEditingTimeMember({ ...editingTimeMember, checkInTime: e.target.value })}
+                  placeholder="e.g. 06:30:00 PM"
+                  className="w-full px-3 py-2 bg-secondary border border-gray-700 rounded-xl text-sm font-mono font-bold text-white focus:outline-none focus:border-amber-500"
+                />
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingTimeMember({
+                      ...editingTimeMember,
+                      checkInTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+                    })}
+                    className="px-2 py-0.5 rounded bg-secondary hover:bg-gray-700 text-[10px] font-mono text-amber-300 border border-gray-700 cursor-pointer"
+                  >
+                    ⚡ Current
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTimeMember({ ...editingTimeMember, checkInTime: '07:00:00 AM' })}
+                    className="px-2 py-0.5 rounded bg-secondary hover:bg-gray-700 text-[10px] font-mono text-gray-300 border border-gray-700 cursor-pointer"
+                  >
+                    🌅 07:00 AM
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTimeMember({ ...editingTimeMember, checkInTime: '06:30:00 PM' })}
+                    className="px-2 py-0.5 rounded bg-secondary hover:bg-gray-700 text-[10px] font-mono text-gray-300 border border-gray-700 cursor-pointer"
+                  >
+                    🌙 06:30 PM
+                  </button>
+                </div>
+              </div>
+
+              {/* Check-Out Field */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block font-semibold text-blue-300">
+                    Departure / Check-Out Time
+                  </label>
+                  {editingTimeMember.checkOutTime && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingTimeMember({ ...editingTimeMember, checkOutTime: '' })}
+                      className="text-[10px] text-red-400 hover:underline cursor-pointer"
+                    >
+                      Clear Check-Out
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={editingTimeMember.checkOutTime}
+                  onChange={(e) => setEditingTimeMember({ ...editingTimeMember, checkOutTime: e.target.value })}
+                  placeholder="e.g. 08:00:00 PM (or leave blank if on floor)"
+                  className="w-full px-3 py-2 bg-secondary border border-gray-700 rounded-xl text-sm font-mono font-bold text-white focus:outline-none focus:border-blue-500"
+                />
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingTimeMember({
+                      ...editingTimeMember,
+                      checkOutTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+                    })}
+                    className="px-2 py-0.5 rounded bg-secondary hover:bg-gray-700 text-[10px] font-mono text-blue-300 border border-gray-700 cursor-pointer"
+                  >
+                    ⚡ Current
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTimeMember({ ...editingTimeMember, checkOutTime: '08:30:00 AM' })}
+                    className="px-2 py-0.5 rounded bg-secondary hover:bg-gray-700 text-[10px] font-mono text-gray-300 border border-gray-700 cursor-pointer"
+                  >
+                    🌅 08:30 AM
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTimeMember({ ...editingTimeMember, checkOutTime: '08:00:00 PM' })}
+                    className="px-2 py-0.5 rounded bg-secondary hover:bg-gray-700 text-[10px] font-mono text-gray-300 border border-gray-700 cursor-pointer"
+                  >
+                    🌙 08:00 PM
+                  </button>
+                </div>
+              </div>
+
+              {/* Calculated Stay Duration preview */}
+              <div className="p-2.5 rounded-xl bg-secondary/80 border border-gray-800 flex items-center justify-between">
+                <span className="text-[11px] text-text-secondary">Estimated Facility Stay:</span>
+                <span className="text-xs font-mono font-bold text-emerald-400">
+                  {calculateStayDuration(editingTimeMember.checkInTime, editingTimeMember.checkOutTime)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-800">
+              <button
+                type="button"
+                onClick={() => setEditingTimeMember(null)}
+                className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-xl text-xs font-semibold text-text-primary cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateAttendance(
+                    editingTimeMember.member.id,
+                    selectedDate,
+                    true,
+                    editingTimeMember.checkInTime,
+                    editingTimeMember.checkOutTime
+                  );
+                  setEditingTimeMember(null);
+                }}
+                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white shadow-md cursor-pointer"
+              >
+                Save Timestamps
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface QuickDuesModalProps {
+  member: Member;
+  onClose: () => void;
+  onSave: (updatedMember: Member, paymentMethod: Payment['method']) => void;
+}
+
+const QuickDuesModal: React.FC<QuickDuesModalProps> = ({ member, onClose, onSave }) => {
+  const feeDetails = getMemberFeeDetails(member);
+  const [paymentMode, setPaymentMode] = useState<'full' | 'partial' | 'unpaid'>(
+    feeDetails.isFullyPaid ? 'full' : feeDetails.isPartial ? 'partial' : 'partial'
+  );
+  const [paidAmountInput, setPaidAmountInput] = useState<string>(
+    feeDetails.isFullyPaid 
+      ? String(feeDetails.fee) 
+      : feeDetails.isPartial 
+        ? String(feeDetails.paidAmount) 
+        : ''
+  );
+  const [paymentMethod, setPaymentMethod] = useState<Payment['method']>('Cash');
+
+  const parsedPaid = paymentMode === 'full' 
+    ? feeDetails.fee 
+    : paymentMode === 'unpaid' 
+      ? 0 
+      : Math.min(feeDetails.fee, Math.max(0, parseFloat(paidAmountInput) || 0));
+
+  const remainingDue = Math.max(0, feeDetails.fee - parsedPaid);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const isFull = parsedPaid >= feeDetails.fee && feeDetails.fee > 0;
+    const updatedMember: Member = {
+      ...member,
+      feePaid: isFull,
+      paidAmount: parsedPaid,
+      pendingDue: remainingDue,
+    };
+    onSave(updatedMember, paymentMethod);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-surface rounded-2xl shadow-2xl p-6 w-full max-w-md border border-gray-700/80 relative">
+        <button 
+          onClick={onClose} 
+          className="absolute top-4 right-4 text-text-secondary hover:text-text-primary p-1 rounded-lg hover:bg-secondary transition-colors"
+        >
+          <CloseIcon className="h-5 w-5" />
+        </button>
+
+        <div className="mb-5">
+          <div>
+            <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
+              <span>{member.name}</span>
+              <ConsistentMemberStar member={member} size="sm" />
+              <span className="text-xs font-mono px-2 py-0.5 rounded bg-secondary text-text-secondary">
+                #{member.registrationNo}
+              </span>
+            </h3>
+            <p className="text-xs text-text-secondary font-medium mt-1">
+              Plan Fee: <strong className="text-white font-mono">Rs {feeDetails.fee.toLocaleString()}</strong> ({member.plan})
+            </p>
+          </div>
+        </div>
+
+        {/* Current State Summary */}
+        <div className="grid grid-cols-2 gap-3 p-3.5 bg-secondary/70 rounded-xl border border-gray-800 mb-5 text-center">
+          <div>
+            <span className="text-[11px] text-text-secondary uppercase tracking-wider font-semibold block">Amount Paid</span>
+            <span className="text-lg font-mono font-bold text-emerald-400">Rs {parsedPaid.toLocaleString()}</span>
+          </div>
+          <div className="border-l border-gray-700 pl-3">
+            <span className="text-[11px] text-text-secondary uppercase tracking-wider font-semibold block">Remaining Balance</span>
+            <span className={`text-lg font-mono font-bold ${remainingDue === 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+              Rs {remainingDue.toLocaleString()}
+            </span>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Quick Payment Mode Buttons */}
+          <div>
+            <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">
+              Payment Option
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPaymentMode('full');
+                  setPaidAmountInput(String(feeDetails.fee));
+                }}
+                className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                  paymentMode === 'full'
+                    ? 'bg-emerald-600 text-white border-emerald-500 shadow-md ring-2 ring-emerald-500/30'
+                    : 'bg-secondary text-text-secondary border-gray-700 hover:text-white'
+                }`}
+              >
+                ✓ Full (Rs 0 Due)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPaymentMode('partial');
+                  setPaidAmountInput('');
+                }}
+                className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                  paymentMode === 'partial'
+                    ? 'bg-amber-600 text-white border-amber-500 shadow-md ring-2 ring-amber-500/30'
+                    : 'bg-secondary text-text-secondary border-gray-700 hover:text-white'
+                }`}
+              >
+                ⏳ Partial Payment
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPaymentMode('unpaid');
+                  setPaidAmountInput('0');
+                }}
+                className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                  paymentMode === 'unpaid'
+                    ? 'bg-red-600 text-white border-red-500 shadow-md ring-2 ring-red-500/30'
+                    : 'bg-secondary text-text-secondary border-gray-700 hover:text-white'
+                }`}
+              >
+                ✕ Unpaid
+              </button>
+            </div>
+          </div>
+
+          {/* Amount Paid Input (When Partial) */}
+          {paymentMode === 'partial' && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2">
+              <label className="block text-xs font-bold text-amber-300 uppercase tracking-wider">
+                Amount Received So Far (PKR)
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min={0}
+                  max={feeDetails.fee}
+                  value={paidAmountInput}
+                  onChange={(e) => setPaidAmountInput(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2.5 bg-secondary border border-gray-700 rounded-lg text-white font-mono font-bold text-base focus:border-amber-500 focus:outline-none"
+                  placeholder="Enter amount (e.g. 600, 700)"
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-mono text-xs">
+                  Rs
+                </span>
+              </div>
+              <p className="text-xs text-text-secondary flex justify-between">
+                <span>Total Fee: Rs {feeDetails.fee.toLocaleString()}</span>
+                <span className="text-amber-400 font-semibold font-mono">
+                  Pending Due: Rs {remainingDue.toLocaleString()}
+                </span>
+              </p>
+            </div>
+          )}
+
+          {/* Payment Method */}
+          {(paymentMode === 'full' || paymentMode === 'partial') && (
+            <div>
+              <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1.5">
+                Payment Method
+              </label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value as Payment['method'])}
+                className="w-full p-2.5 bg-secondary border border-gray-700 rounded-xl text-sm font-medium text-text-primary focus:border-primary focus:outline-none cursor-pointer"
+              >
+                <option value="Cash">Cash</option>
+                <option value="Easypaisa">Easypaisa</option>
+                <option value="Jazz Cash">Jazz Cash</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+              </select>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-900/30 transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <span>Save & Update Dues</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

@@ -798,7 +798,7 @@ const MemberReportDetails: React.FC<{ member: Member; payments: Payment[] }> = (
                                     <div className="flex justify-center items-center gap-2 sm:gap-4 text-[9px] font-mono text-gray-400 print:text-black pt-0.5">
                                         <span>REF: SFM-POLICE-{member.registrationNo}-{Date.now().toString().slice(-5)}</span>
                                         <span>·</span>
-                                        <span>ISSUED: {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                        <span>ISSUED: {formatDateDDMMYYYY(new Date())}</span>
                                         <span>·</span>
                                         <span className="text-emerald-400 print:text-black font-bold">AUTHENTICATED RECORD</span>
                                     </div>
@@ -1405,7 +1405,7 @@ const FacilityPoliceInvestigationLog: React.FC<{
                   <span>·</span>
                   <span>VERIFIED ATTENDEES: <strong>{checkedInMembers.length}</strong></span>
                   <span>·</span>
-                  <span>ISSUED: {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  <span>ISSUED: {formatDateDDMMYYYY(new Date())}</span>
                 </div>
               </div>
 

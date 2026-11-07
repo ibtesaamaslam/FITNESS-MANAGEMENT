@@ -21,6 +21,44 @@
   color-scheme: dark;
 }
 
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #0f172a;
+  overflow: hidden;
+}
+
+/* =========================================================
+   APP-WIDE 0.80 SCALE (0.80 SIZE)
+   Scales entire app to 0.80 size with 125vh so (125vh * 0.8 = 100vh)
+   fills the entire screen with zero black bar or letterboxing.
+   ========================================================= */
+#root {
+  zoom: 0.8;
+  width: 100%;
+  height: 125vh;
+  min-height: 125vh;
+  max-height: 125vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-background, #0f172a);
+  overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  #root {
+    zoom: 1 !important;
+    height: 100% !important;
+    min-height: 100vh !important;
+    max-height: none !important;
+  }
+  html, body {
+    overflow: auto;
+  }
+}
+
 /* Ensure crisp white headings in dark mode */
 html:not([data-theme="light"]) h1,
 html:not([data-theme="light"]) h2,
@@ -114,4 +152,101 @@ html[data-theme="light"] .text-red-400 {
 }
 html[data-theme="light"] .text-blue-400 {
   color: #2563EB !important;
+}
+
+/* High visibility custom scrollbar like user requested */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: #ffffff;
+}
+::-webkit-scrollbar-thumb {
+  background: #8e8e8e;
+  border-radius: 6px;
+  border: 2px solid #ffffff;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #555555;
+}
+
+* {
+  scrollbar-width: auto;
+  scrollbar-color: #8e8e8e #ffffff;
+}
+
+/* =========================================================
+   DARK THEMED DROPDOWN MENUS, SELECTS & OPTIONS
+   ========================================================= */
+
+select {
+  color-scheme: dark;
+}
+
+html:not([data-theme="light"]) select {
+  color-scheme: dark;
+  background-color: var(--color-secondary, #252e3e);
+  color: #ffffff;
+}
+
+html:not([data-theme="light"]) select option,
+html:not([data-theme="light"]) select optgroup {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  padding: 10px 12px !important;
+}
+
+html:not([data-theme="light"]) select option:checked,
+html:not([data-theme="light"]) select option:hover,
+html:not([data-theme="light"]) select option:focus {
+  background-color: #0f172a !important;
+  color: #10b981 !important;
+}
+
+/* Calendar & date indicator controls in dark theme */
+html:not([data-theme="light"]) input[type="date"],
+html:not([data-theme="light"]) input[type="month"],
+html:not([data-theme="light"]) input[type="time"],
+html:not([data-theme="light"]) input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+html:not([data-theme="light"]) input[type="date"]::-webkit-calendar-picker-indicator,
+html:not([data-theme="light"]) input[type="month"]::-webkit-calendar-picker-indicator,
+html:not([data-theme="light"]) input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+html:not([data-theme="light"]) input[type="date"]::-webkit-calendar-picker-indicator:hover,
+html:not([data-theme="light"]) input[type="month"]::-webkit-calendar-picker-indicator:hover,
+html:not([data-theme="light"]) input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* Light mode dropdown styling overrides */
+html[data-theme="light"] select {
+  color-scheme: light;
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+html[data-theme="light"] select option,
+html[data-theme="light"] select optgroup {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+html[data-theme="light"] input[type="date"],
+html[data-theme="light"] input[type="month"],
+html[data-theme="light"] input[type="time"] {
+  color-scheme: light;
+}
+
+html[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator,
+html[data-theme="light"] input[type="month"]::-webkit-calendar-picker-indicator,
+html[data-theme="light"] input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: none;
 }

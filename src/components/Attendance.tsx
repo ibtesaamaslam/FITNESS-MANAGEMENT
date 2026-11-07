@@ -16,6 +16,8 @@ interface AttendanceProps {
   members: Member[];
   role: Role;
   onUpdateAttendance: (memberId: string, date: string, present: boolean, customTime?: string, customCheckOutTime?: string) => void;
+  onBatchUpdateAttendance?: (memberIds: string[], date: string, present: boolean) => void;
+  onClearAttendanceForDate?: (date: string) => void;
   onUpdateCheckOut?: (memberId: string, date: string, checkOutTime?: string) => void;
   onCheckOutAllActive?: (date: string) => void;
   onWarning?: (message: string) => void;
@@ -48,6 +50,8 @@ const Attendance: React.FC<AttendanceProps> = ({
   members, 
   role, 
   onUpdateAttendance, 
+  onBatchUpdateAttendance,
+  onClearAttendanceForDate,
   onUpdateCheckOut,
   onCheckOutAllActive,
   onWarning, 
@@ -77,7 +81,7 @@ const Attendance: React.FC<AttendanceProps> = ({
     return members.map(member => ({
       ...member,
       gender: member.gender || 'Male',
-      present: member.attendance[selectedDate] || false,
+      present: !!member.attendance?.[selectedDate],
     }));
   }, [members, selectedDate]);
 
@@ -187,11 +191,42 @@ const Attendance: React.FC<AttendanceProps> = ({
   const totalAbsent = filteredMembers.length - totalPresent;
 
   const handleMarkAllFiltered = (presentState: boolean) => {
-    filteredMembers.forEach(member => {
-      if (member.present !== presentState) {
-        onUpdateAttendance(member.id, selectedDate, presentState);
+    const count = filteredMembers.length;
+    if (count === 0) return;
+
+    if (presentState) {
+      const confirmed = window.confirm(
+        `⚠️ ATTENDANCE CONFIRMATION:\n\nAre you sure you want to mark ALL ${count} visible members as PRESENT for ${formatDateDDMMYYYY(selectedDate)}?\n\n• In standard gym operations, members check in individually as they enter.\n• Only proceed if all ${count} members are actually attending.`
+      );
+      if (!confirmed) return;
+
+      if (onBatchUpdateAttendance) {
+        onBatchUpdateAttendance(filteredMembers.map(m => m.id), selectedDate, true);
+      } else {
+        filteredMembers.forEach(member => {
+          if (!member.present) {
+            onUpdateAttendance(member.id, selectedDate, true);
+          }
+        });
       }
-    });
+    } else {
+      const confirmed = window.confirm(
+        `⚠️ RESET ATTENDANCE TO ABSENT:\n\nAre you sure you want to mark all ${count} visible members as ABSENT for ${formatDateDDMMYYYY(selectedDate)}?\n\nThis will clear check-in and check-out logs for this date.`
+      );
+      if (!confirmed) return;
+
+      if (genderFilter === 'All' && !searchTerm.trim() && onClearAttendanceForDate) {
+        onClearAttendanceForDate(selectedDate);
+      } else if (onBatchUpdateAttendance) {
+        onBatchUpdateAttendance(filteredMembers.map(m => m.id), selectedDate, false);
+      } else {
+        filteredMembers.forEach(member => {
+          if (member.present) {
+            onUpdateAttendance(member.id, selectedDate, false);
+          }
+        });
+      }
+    }
   };
 
   const activeInsideMembers = useMemo(() => {
@@ -223,6 +258,30 @@ const Attendance: React.FC<AttendanceProps> = ({
           />
         </div>
       </div>
+
+      {/* Alert banner if 100% of members are marked present (helps gym owner easily reset) */}
+      {attendanceForDate.length > 0 && attendanceForDate.every(m => m.present) && !isFutureDate && (
+        <div className="bg-amber-500/15 border-2 border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <p className="text-sm font-bold text-amber-300">
+                Notice: All {attendanceForDate.length} members are currently marked as PRESENT for {formatDateDDMMYYYY(selectedDate)}.
+              </p>
+              <p className="text-xs text-text-secondary mt-0.5">
+                If all members were marked present by mistake before closing gym, click "Reset All to Absent" to clear today's attendance.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleMarkAllFiltered(false)}
+            className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs transition-all shadow-md cursor-pointer shrink-0"
+          >
+            ✕ Reset All to Absent
+          </button>
+        </div>
+      )}
       
       {/* Real-Time Facility Occupancy Strip */}
       <div className="bg-surface border border-gray-800 rounded-2xl p-4 shadow-lg flex flex-wrap items-center justify-between gap-4">

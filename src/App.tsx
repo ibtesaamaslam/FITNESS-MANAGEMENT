@@ -105,6 +105,8 @@ const App: React.FC = () => {
         sellAccessoryItem,
         deleteAccessorySale,
         updateAttendance,
+        batchUpdateAttendance,
+        clearAttendanceForDate,
         updateCheckOut,
         checkOutAllActiveMembers,
         toggleReminder,
@@ -191,6 +193,16 @@ const App: React.FC = () => {
         updateAttendance(memberId, date, present, customTime, customCheckOutTime);
     }, [updateAttendance]);
 
+    const handleBatchUpdateAttendance = useCallback((memberIds: string[], date: string, present: boolean) => {
+        batchUpdateAttendance(memberIds, date, present);
+        showToast(present ? `Marked ${memberIds.length} members present` : `Marked ${memberIds.length} members absent`, 'info');
+    }, [batchUpdateAttendance, showToast]);
+
+    const handleClearAttendanceForDate = useCallback((date: string) => {
+        clearAttendanceForDate(date);
+        showToast('Reset all attendance records for date to absent', 'info');
+    }, [clearAttendanceForDate, showToast]);
+
     const handleUpdateCheckOut = useCallback((memberId: string, date: string, checkOutTime?: string) => {
         updateCheckOut(memberId, date, checkOutTime);
         showToast('Check-out timestamp updated', 'info');
@@ -264,6 +276,8 @@ const App: React.FC = () => {
                         members={members}
                         role={role}
                         onUpdateAttendance={handleUpdateAttendance}
+                        onBatchUpdateAttendance={handleBatchUpdateAttendance}
+                        onClearAttendanceForDate={handleClearAttendanceForDate}
                         onUpdateCheckOut={handleUpdateCheckOut}
                         onCheckOutAllActive={handleCheckOutAllActiveMembers}
                         onWarning={(msg) => showToast(msg, 'error')}

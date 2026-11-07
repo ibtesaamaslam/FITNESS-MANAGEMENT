@@ -1,12 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { Expense, Payment } from '../types';
-import { TrashIcon, ExpenseIcon } from './icons';
-import { getLocalDateString, getLocalMonthString } from '../lib/dateUtils';
+import { Expense, Payment, AccessorySale, Role } from '../types';
+import { TrashIcon, ExpenseIcon, AccessoriesIcon } from './icons';
+import { getLocalDateString, getLocalMonthString, formatDateDDMMYYYY } from '../lib/dateUtils';
 import { MaskedAmount } from './MaskedAmount';
 
 interface MonthlyExpenseProps {
   expenses: Expense[];
   payments: Payment[];
+  accessorySales?: AccessorySale[];
+  role?: Role;
   onAddExpense: (expense: Omit<Expense, 'id'>) => void;
   onDeleteExpense: (id: string) => void;
   isUnlocked?: boolean;
@@ -16,6 +18,8 @@ interface MonthlyExpenseProps {
 const MonthlyExpense: React.FC<MonthlyExpenseProps> = ({
   expenses,
   payments,
+  accessorySales,
+  role = 'Admin',
   onAddExpense,
   onDeleteExpense,
   isUnlocked = false,
@@ -25,6 +29,7 @@ const MonthlyExpense: React.FC<MonthlyExpenseProps> = ({
   const [newExpenseTitle, setNewExpenseTitle] = useState('');
   const [newExpenseAmount, setNewExpenseAmount] = useState('');
   const [newExpenseCategory, setNewExpenseCategory] = useState('General');
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
 
   const filteredExpenses = useMemo(() => {
     return expenses.filter(e => e.date.startsWith(selectedMonth));
@@ -34,9 +39,32 @@ const MonthlyExpense: React.FC<MonthlyExpenseProps> = ({
     return payments.filter(p => p.date.startsWith(selectedMonth));
   }, [payments, selectedMonth]);
 
-  const totalRevenue = useMemo(() => {
-    return filteredPayments.reduce((sum, p) => sum + p.amount, 0);
+  const monthlyAccessorySales = useMemo(() => {
+    return (accessorySales || []).filter(s => s.date.startsWith(selectedMonth));
+  }, [accessorySales, selectedMonth]);
+
+  const feePayments = useMemo(() => {
+    return filteredPayments.filter(p => p.type !== 'Accessory');
   }, [filteredPayments]);
+
+  const feeRevenue = useMemo(() => {
+    return feePayments.reduce((sum, p) => sum + p.amount, 0);
+  }, [feePayments]);
+
+  const accessoryRevenue = useMemo(() => {
+    return monthlyAccessorySales.reduce((sum, s) => sum + s.totalAmount, 0);
+  }, [monthlyAccessorySales]);
+
+  const accessoryProfit = useMemo(() => {
+    return monthlyAccessorySales.reduce((sum, s) => sum + s.totalProfit, 0);
+  }, [monthlyAccessorySales]);
+
+  const accessorySalesCount = monthlyAccessorySales.length;
+  const accessoryItemsCount = useMemo(() => {
+    return monthlyAccessorySales.reduce((sum, s) => sum + s.quantity, 0);
+  }, [monthlyAccessorySales]);
+
+  const totalRevenue = feeRevenue + accessoryRevenue;
 
   const totalExpense = useMemo(() => {
     return filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -80,32 +108,61 @@ const MonthlyExpense: React.FC<MonthlyExpenseProps> = ({
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-surface p-6 rounded-xl shadow-lg border border-gray-800">
-          <h3 className="text-text-secondary text-xs font-bold uppercase tracking-widest mb-1">Total Revenue</h3>
-          <div className="text-3xl font-black text-green-400">
-            <MaskedAmount amount={totalRevenue} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-surface p-5 sm:p-6 rounded-2xl shadow-lg border border-gray-800 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h3 className="text-text-secondary text-xs font-bold uppercase tracking-wider">Total Combined Revenue</h3>
+              <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-0.5 rounded-full whitespace-nowrap">
+                Fees + Store
+              </span>
+            </div>
+            <div className="text-3xl font-black text-green-400 mb-3">
+              <MaskedAmount amount={totalRevenue} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
+            </div>
           </div>
-          <p className="text-xs text-text-secondary mt-2">Member payments for {selectedMonth}</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-text-secondary mt-1">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-gray-400">Fees:</span>
+              <span className="text-text-primary font-mono font-semibold">
+                <MaskedAmount amount={feeRevenue} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-gray-400">Store Sales:</span>
+              <span className="text-text-primary font-mono font-semibold">
+                <MaskedAmount amount={accessoryRevenue} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="bg-surface p-6 rounded-xl shadow-lg border border-gray-800">
+
+        <div className="bg-surface p-6 rounded-2xl shadow-lg border border-gray-800">
+          <h3 className="text-text-secondary text-xs font-bold uppercase tracking-widest mb-1">Accessory Profit</h3>
+          <div className="text-3xl font-black text-text-primary">
+            <MaskedAmount amount={accessoryProfit} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
+          </div>
+          <p className="text-xs text-text-secondary mt-2">
+            {accessorySalesCount} sale(s) • {accessoryItemsCount} total item(s) sold
+          </p>
+        </div>
+
+        <div className="bg-surface p-6 rounded-2xl shadow-lg border border-gray-800">
           <h3 className="text-text-secondary text-xs font-bold uppercase tracking-widest mb-1">Total Expenses</h3>
           <div className="text-3xl font-black text-red-400">
             <MaskedAmount amount={totalExpense} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
           </div>
           <p className="text-xs text-text-secondary mt-2">Recorded expenses for {selectedMonth}</p>
         </div>
-        <div className="bg-surface p-6 rounded-xl shadow-lg border border-primary/30 bg-gradient-to-br from-surface to-primary/5">
+
+        <div className="bg-surface p-6 rounded-2xl shadow-lg border border-primary/30 bg-gradient-to-br from-surface to-primary/5">
           <h3 className="text-text-secondary text-xs font-bold uppercase tracking-widest mb-1">Net Profit</h3>
           <div className={`text-3xl font-black ${netProfit >= 0 ? 'text-primary' : 'text-red-500'}`}>
             <MaskedAmount amount={netProfit} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
           </div>
-          <div className="mt-2 w-full bg-gray-700 h-1 rounded-full overflow-hidden">
-             <div 
-               className={`h-full ${netProfit >= 0 ? 'bg-primary' : 'bg-red-500'}`} 
-               style={{ width: `${Math.min(100, Math.abs((netProfit / (totalRevenue || 1)) * 100))}%` }}
-             />
-          </div>
+          <p className="text-xs text-text-secondary mt-2">
+            Total Revenue - Total Expenses
+          </p>
         </div>
       </div>
 
@@ -197,21 +254,27 @@ const MonthlyExpense: React.FC<MonthlyExpenseProps> = ({
                            {expense.category}
                          </span>
                        </td>
-                       <td className="p-4 text-sm text-text-secondary font-mono">{expense.date}</td>
+                       <td className="p-4 text-sm text-text-secondary font-mono">{formatDateDDMMYYYY(expense.date)}</td>
                        <td className="p-4 text-red-400 font-bold font-mono">
-                         Rs {expense.amount}
+                         <MaskedAmount amount={expense.amount} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
                        </td>
                        <td className="p-4 text-right">
-                         <button
-                           onClick={() => {
-                             if(window.confirm(`Delete expense "${expense.title}"?`)) {
-                               onDeleteExpense(expense.id);
-                             }
-                           }}
-                           className="p-2 text-red-500 hover:bg-red-500/10 rounded transition-colors"
-                         >
-                           <TrashIcon className="h-5 w-5" />
-                         </button>
+                         {role === 'Admin' ? (
+                           <button
+                             onClick={() => {
+                               if(window.confirm(`Delete expense "${expense.title}"?`)) {
+                                 onDeleteExpense(expense.id);
+                               }
+                             }}
+                             className="p-2 text-red-500 hover:bg-red-500/10 rounded transition-colors cursor-pointer"
+                           >
+                             <TrashIcon className="h-5 w-5" />
+                           </button>
+                         ) : (
+                           <span className="text-gray-500 text-[11px] px-2 py-1 bg-gray-800/40 rounded border border-gray-700/50 cursor-not-allowed select-none" title="Admin authority required to delete expense records">
+                             Admin Only
+                           </span>
+                         )}
                        </td>
                      </tr>
                    )) : (
@@ -227,6 +290,47 @@ const MonthlyExpense: React.FC<MonthlyExpenseProps> = ({
           </div>
         </div>
       </div>
+
+      {/* CONFIRM DELETE EXPENSE MODAL */}
+      {expenseToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-surface border border-gray-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-red-400">
+              <div className="p-3 bg-red-500/15 border border-red-500/30 rounded-full">
+                <TrashIcon className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-text-primary">Delete Expense?</h3>
+                <p className="text-xs text-text-secondary">This action cannot be undone.</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-text-secondary bg-secondary/50 p-3 rounded-xl border border-gray-800">
+              Are you sure you want to delete <strong className="text-text-primary">{expenseToDelete.title}</strong> (Rs {expenseToDelete.amount})?
+            </p>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setExpenseToDelete(null)}
+                className="flex-1 py-2.5 bg-secondary hover:bg-gray-700 text-text-secondary font-bold text-xs rounded-xl border border-gray-700 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteExpense(expenseToDelete.id);
+                  setExpenseToDelete(null);
+                }}
+                className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold text-xs rounded-xl shadow-lg cursor-pointer"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

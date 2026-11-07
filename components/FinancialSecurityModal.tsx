@@ -6,7 +6,7 @@ interface FinancialSecurityModalProps {
   mode: 'set_password' | 'unlock' | 'change_password';
   onClose: () => void;
   onVerifyAndUnlock: (password: string) => boolean;
-  onSetInitialPassword: (newPass: string) => { success: boolean; message: string };
+  onSetInitialPassword: (newPass: string, adminPass?: string) => { success: boolean; message: string };
   onChangePassword: (currentPass: string, newPass: string) => { success: boolean; message: string };
   onSwitchMode: (mode: 'set_password' | 'unlock' | 'change_password') => void;
 }
@@ -20,11 +20,13 @@ export const FinancialSecurityModal: React.FC<FinancialSecurityModalProps> = ({
   onChangePassword,
   onSwitchMode,
 }) => {
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [currentPasswordInput, setCurrentPasswordInput] = useState('');
   const [newPasswordInput, setNewPasswordInput] = useState('');
   const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
   
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -40,14 +42,21 @@ export const FinancialSecurityModal: React.FC<FinancialSecurityModalProps> = ({
     setErrorMsg('');
     setSuccessMsg('');
 
+    const storedAdminPass = localStorage.getItem('gym_auth_admin') || 'admin';
+    if (adminPasswordInput !== storedAdminPass) {
+      setErrorMsg('Incorrect Admin Password. Please enter valid Admin password.');
+      return;
+    }
+
     if (newPasswordInput !== confirmPasswordInput) {
       setErrorMsg('Passwords do not match.');
       return;
     }
 
-    const result = onSetInitialPassword(newPasswordInput);
+    const result = onSetInitialPassword(newPasswordInput, adminPasswordInput);
     if (result.success) {
       setSuccessMsg(result.message);
+      setAdminPasswordInput('');
       setNewPasswordInput('');
       setConfirmPasswordInput('');
     } else {
@@ -145,6 +154,33 @@ export const FinancialSecurityModal: React.FC<FinancialSecurityModalProps> = ({
           <form onSubmit={handleSetInitialPasswordSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
+                Admin Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showAdminPassword ? 'text' : 'password'}
+                  value={adminPasswordInput}
+                  onChange={(e) => {
+                    setAdminPasswordInput(e.target.value);
+                    setErrorMsg('');
+                  }}
+                  placeholder="Enter admin password (e.g. admin)"
+                  required
+                  autoFocus
+                  className="w-full bg-secondary py-3 px-4 pr-16 rounded-xl text-sm font-semibold text-text-primary border border-gray-700 focus:outline-none focus:border-primary transition-all outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAdminPassword(!showAdminPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-text-secondary hover:text-text-primary px-2 py-1 rounded bg-surface/80 border border-gray-700/60 hover:bg-secondary transition-colors cursor-pointer"
+                >
+                  {showAdminPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
                 New Owner Password
               </label>
               <div className="relative">
@@ -158,7 +194,6 @@ export const FinancialSecurityModal: React.FC<FinancialSecurityModalProps> = ({
                   placeholder="Enter new owner password"
                   required
                   minLength={3}
-                  autoFocus
                   className="w-full bg-secondary py-3 px-4 pr-16 rounded-xl text-sm font-semibold text-text-primary border border-gray-700 focus:outline-none focus:border-primary transition-all outline-none"
                 />
                 <button

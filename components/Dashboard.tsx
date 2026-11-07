@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Member, Payment, View } from '../types';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Member, Payment, View, AccessorySale, Role } from '../types';
 import { 
   TrashIcon, 
   CloseIcon, 
@@ -12,14 +12,21 @@ import {
   ClipboardCheckIcon, 
   UserPlusIcon, 
   ReceiptIcon, 
-  ClipboardListIcon 
+  ClipboardListIcon,
+  AccessoriesIcon,
+  StaffIcon,
+  BackupIcon
 } from './icons';
-import { getLocalDateString, getLocalMonthString, isMemberArchived } from '../lib/dateUtils';
+import { getLocalDateString, getLocalMonthString, isMemberArchived, formatDateDDMMYYYY } from '../lib/dateUtils';
 import { MaskedAmount } from './MaskedAmount';
+import { GenderBadge } from './Members';
+import { ConsistentMemberStar } from './ConsistentMemberStar';
 
 interface DashboardProps {
   members: Member[];
   payments: Payment[];
+  accessorySales?: AccessorySale[];
+  role?: Role;
   onNavigate: (view: View) => void;
   onDeletePayment: (id: string) => void;
   isUnlocked?: boolean;
@@ -29,17 +36,19 @@ interface DashboardProps {
 const StatCard: React.FC<{ 
   title: string; 
   value: React.ReactNode; 
+  subValue?: React.ReactNode;
   icon: React.ReactNode;
   iconBgColor?: string;
   iconColor?: string;
-}> = ({ title, value, icon, iconBgColor = "bg-teal-500/15 border-teal-500/30", iconColor = "text-teal-400" }) => (
+}> = ({ title, value, subValue, icon, iconBgColor = "bg-teal-500/15 border-teal-500/30", iconColor = "text-teal-400" }) => (
   <div className="bg-surface p-5 rounded-xl shadow-lg border border-gray-800/80 flex items-center space-x-4">
     <div className={`p-3 rounded-full border ${iconBgColor} ${iconColor} shrink-0 flex items-center justify-center`}>
       {icon}
     </div>
-    <div className="overflow-hidden">
+    <div className="overflow-hidden min-w-0 flex-1">
       <p className="text-xs font-medium text-text-secondary mb-1">{title}</p>
       <div className="text-2xl font-bold text-text-primary tracking-tight">{value}</div>
+      {subValue && <div className="mt-1">{subValue}</div>}
     </div>
   </div>
 );
@@ -63,7 +72,7 @@ const ConfirmPaymentDeleteModal: React.FC<{
                     <h3 className="text-xl font-bold text-text-primary">Delete Payment</h3>
                  </div>
                  <p className="mb-6 text-text-secondary text-sm">
-                    Are you sure you want to delete the payment of <span className="text-text-primary font-bold">Rs {payment.amount}</span> for <span className="text-text-primary font-bold">{payment.memberName}</span> dated {payment.date}?
+                    Are you sure you want to delete the payment of <span className="text-text-primary font-bold">Rs {payment.amount}</span> for <span className="text-text-primary font-bold">{payment.memberName}</span> dated {formatDateDDMMYYYY(payment.date)}?
                  </p>
                  <div className="flex justify-end space-x-3">
                     <button onClick={onClose} className="px-4 py-2 bg-secondary hover:bg-gray-700/50 rounded-xl text-xs font-bold text-text-primary transition-colors">Cancel</button>
@@ -74,7 +83,7 @@ const ConfirmPaymentDeleteModal: React.FC<{
     );
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate, onDeletePayment, isUnlocked = false, onUnlockRequest }) => {
+const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales = [], role = 'Admin', onNavigate, onDeletePayment, isUnlocked = false, onUnlockRequest }) => {
   const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
 
   const nonArchivedMembers = useMemo(() => {
@@ -82,42 +91,105 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate, on
   }, [members]);
 
   const totalMembers = nonArchivedMembers.length;
-  const activeMembers = nonArchivedMembers.filter(m => new Date(m.expiryDate) >= new Date(getLocalDateString())).length;
-  const monthlyIncome = payments
-    .filter(p => p.date.startsWith(getLocalMonthString()))
-    .reduce((sum, p) => sum + p.amount, 0);
+  const maleMembers = nonArchivedMembers.filter(m => (m.gender || 'Male') === 'Male').length;
+  const femaleMembers = nonArchivedMembers.filter(m => m.gender === 'Female').length;
 
   const todayStr = getLocalDateString();
-  const todaysAttendance = nonArchivedMembers.map(m => m.attendance[todayStr]).filter(Boolean).length;
-  
-  const attendanceData = Array.from({ length: 7 }).map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dateStr = getLocalDateString(d);
-    const presentCount = nonArchivedMembers.filter(m => m.attendance[dateStr]).length;
-    return {
-      name: d.toLocaleDateString('en-US', { weekday: 'short' }),
-      'Present': presentCount,
-    };
-  }).reverse();
+  const activeMembers = nonArchivedMembers.filter(m => m.expiryDate && new Date(m.expiryDate) >= new Date(todayStr)).length;
+  const activeMale = nonArchivedMembers.filter(m => (m.gender || 'Male') === 'Male' && m.expiryDate && new Date(m.expiryDate) >= new Date(todayStr)).length;
+  const activeFemale = nonArchivedMembers.filter(m => m.gender === 'Female' && m.expiryDate && new Date(m.expiryDate) >= new Date(todayStr)).length;
 
-  const yAxisTicks = useMemo(() => {
-    if (totalMembers === 0) return [0, 25, 50, 75, 100];
+  const todaysAttendance = nonArchivedMembers.filter(m => !!m.attendance?.[todayStr]).length;
+  const todayMaleAttendance = nonArchivedMembers.filter(m => (m.gender || 'Male') === 'Male' && !!m.attendance?.[todayStr]).length;
+  const todayFemaleAttendance = nonArchivedMembers.filter(m => m.gender === 'Female' && !!m.attendance?.[todayStr]).length;
+  
+  const currentMonth = getLocalMonthString();
+
+  const monthlyFeePayments = useMemo(() => {
+    return payments.filter(p => p.date.startsWith(currentMonth) && p.type !== 'Accessory');
+  }, [payments, currentMonth]);
+
+  const monthlyAccessorySales = useMemo(() => {
+    return (accessorySales || []).filter(s => s.date.startsWith(currentMonth));
+  }, [accessorySales, currentMonth]);
+
+  const feeIncome = useMemo(() => {
+    return monthlyFeePayments.reduce((sum, p) => sum + p.amount, 0);
+  }, [monthlyFeePayments]);
+
+  const accessoryRevenue = useMemo(() => {
+    return monthlyAccessorySales.reduce((sum, s) => sum + s.totalAmount, 0);
+  }, [monthlyAccessorySales]);
+
+  const accessoryProfit = useMemo(() => {
+    return monthlyAccessorySales.reduce((sum, s) => sum + s.totalProfit, 0);
+  }, [monthlyAccessorySales]);
+
+  const accessorySalesCount = monthlyAccessorySales.length;
+  const accessoryItemsCount = useMemo(() => {
+    return monthlyAccessorySales.reduce((sum, s) => sum + s.quantity, 0);
+  }, [monthlyAccessorySales]);
+
+  const monthlyIncome = feeIncome + accessoryRevenue;
+  
+  const attendanceData = useMemo(() => {
+    return Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = getLocalDateString(d);
+      const maleCount = nonArchivedMembers.filter(m => (m.gender || 'Male') === 'Male' && !!m.attendance?.[dateStr]).length;
+      const femaleCount = nonArchivedMembers.filter(m => m.gender === 'Female' && !!m.attendance?.[dateStr]).length;
+      const totalCount = maleCount + femaleCount;
+      return {
+        name: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        date: dateStr,
+        fullDate: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        Male: maleCount,
+        Female: femaleCount,
+        Total: totalCount,
+        Present: totalCount,
+      };
+    }).reverse();
+  }, [nonArchivedMembers]);
+
+  const maxWeeklyPresent = useMemo(() => {
+    return Math.max(...attendanceData.map(d => d.Total), 0);
+  }, [attendanceData]);
+
+  const { yAxisTicks, yAxisDomain } = useMemo(() => {
+    const peak = Math.max(totalMembers, maxWeeklyPresent, 10);
     
-    const increment = totalMembers > 150 ? 100 : 25;
-    const maxVal = Math.max(totalMembers, increment);
-    const topTick = Math.ceil(maxVal / increment) * increment;
-    
-    const ticks = [];
-    for (let i = 0; i <= topTick; i += increment) {
-        ticks.push(i);
+    let step = 10;
+    if (peak <= 50) {
+      step = 10;
+    } else if (peak <= 100) {
+      step = 20;
+    } else if (peak <= 250) {
+      step = 50;
+    } else if (peak <= 500) {
+      step = 100;
+    } else if (peak <= 1000) {
+      step = 200;
+    } else {
+      step = 500;
     }
-    return ticks;
-  }, [totalMembers]);
+    
+    // Calculate top ceiling (at least 50 by default as requested: 0, 10, 20, 30, 40, 50)
+    const maxVal = Math.max(50, Math.ceil(peak / step) * step);
+    const ticks: number[] = [];
+    for (let i = 0; i <= maxVal; i += step) {
+      ticks.push(i);
+    }
+    return { yAxisTicks: ticks, yAxisDomain: [0, maxVal] as [number, number] };
+  }, [totalMembers, maxWeeklyPresent]);
+
+  const weeklyAverage = useMemo(() => {
+    const sum = attendanceData.reduce((acc, curr) => acc + curr.Total, 0);
+    return Math.round(sum / 7);
+  }, [attendanceData]);
 
   const recentPayments = [...payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
 
-  const currentMonth = getLocalMonthString();
   const overdueMembers = useMemo(() => {
     return nonArchivedMembers.filter(m => {
       const isUnpaid = !m.feePaid;
@@ -135,7 +207,7 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate, on
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-6 w-full max-w-[1600px] mx-auto">
+    <div className="p-4 md:p-8 space-y-6 w-full">
       {paymentToDelete && (
         <ConfirmPaymentDeleteModal 
             payment={paymentToDelete} 
@@ -149,6 +221,13 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate, on
         <StatCard 
           title="Total Members" 
           value={totalMembers} 
+          subValue={
+            <div className="flex items-center gap-2 text-[11px] font-semibold">
+              <span className="text-blue-400">♂ {maleMembers} Male</span>
+              <span className="text-gray-600">·</span>
+              <span className="text-pink-400">♀ {femaleMembers} Female</span>
+            </div>
+          }
           icon={<UsersIcon className="h-5 w-5" />} 
           iconBgColor="bg-teal-500/15 border-teal-500/30"
           iconColor="text-teal-400"
@@ -156,6 +235,13 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate, on
         <StatCard 
           title="Active Members" 
           value={activeMembers} 
+          subValue={
+            <div className="flex items-center gap-2 text-[11px] font-semibold">
+              <span className="text-blue-400">♂ {activeMale} Male</span>
+              <span className="text-gray-600">·</span>
+              <span className="text-pink-400">♀ {activeFemale} Female</span>
+            </div>
+          }
           icon={<UserCheckIcon className="h-5 w-5" />} 
           iconBgColor="bg-emerald-500/15 border-emerald-500/30"
           iconColor="text-emerald-400"
@@ -163,13 +249,25 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate, on
         <StatCard
           title="Monthly Income"
           value={<MaskedAmount amount={monthlyIncome} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />}
-          icon={<CashIcon className="h-5 w-5" />}
+          subValue={
+            <div className="text-[11px] font-medium text-text-secondary">
+              Fees + Store Sales
+            </div>
+          }
+          icon={<CashIcon className="h-5 w-5" />} 
           iconBgColor="bg-blue-500/15 border-blue-500/30"
           iconColor="text-blue-400"
         />
         <StatCard 
           title="Present Today" 
           value={todaysAttendance} 
+          subValue={
+            <div className="flex items-center gap-2 text-[11px] font-semibold">
+              <span className="text-blue-400">♂ {todayMaleAttendance} Male</span>
+              <span className="text-gray-600">·</span>
+              <span className="text-pink-400">♀ {todayFemaleAttendance} Female</span>
+            </div>
+          }
           icon={<ClipboardCheckIcon className="h-5 w-5" />} 
           iconBgColor="bg-amber-500/15 border-amber-500/30"
           iconColor="text-amber-400"
@@ -178,67 +276,161 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate, on
 
       {/* Main Content Grid (Weekly Attendance & Quick Actions) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-surface p-6 rounded-xl shadow-lg border border-gray-800/80">
-          <h2 className="text-base font-bold mb-6 text-text-primary tracking-tight">
-            Weekly Attendance (Count)
-          </h2>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={attendanceData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-secondary, #374151)" />
-              <XAxis dataKey="name" stroke="var(--color-text-secondary, #9CA3AF)" tick={{ fill: 'var(--color-text-secondary, #9CA3AF)', fontSize: 12 }} />
-              <YAxis 
-                stroke="var(--color-text-secondary, #9CA3AF)" 
-                tick={{ fill: 'var(--color-text-secondary, #9CA3AF)', fontSize: 12 }}
-                domain={[0, yAxisTicks[yAxisTicks.length - 1]]}
-                ticks={yAxisTicks}
-              />
-              <Tooltip 
-                contentStyle={{ backgroundColor: 'var(--color-surface, #1F2937)', borderColor: 'var(--color-secondary, #374151)', borderRadius: '0.5rem', color: 'var(--color-text-primary, #FFF)' }}
-              />
-              <Legend wrapperStyle={{ color: 'var(--color-text-secondary, #9CA3AF)', fontSize: '13px' }} />
-              <Bar dataKey="Present" fill="#10B981" radius={[2, 2, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="lg:col-span-2 bg-surface p-5 sm:p-6 pb-3 sm:pb-4 rounded-xl shadow-lg border border-gray-800/80 flex flex-col">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-base font-bold text-text-primary tracking-tight">
+                Weekly Attendance Trend
+              </h2>
+              <p className="text-xs text-text-secondary mt-0.5">Daily check-in activity for the past 7 days</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5 text-xs">
+              <span className="flex items-center gap-1.5 font-semibold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20">
+                <span className="w-2 h-2 rounded-full bg-blue-400 inline-block"></span>
+                <span>♂ Male</span>
+              </span>
+              <span className="flex items-center gap-1.5 font-semibold text-pink-400 bg-pink-500/10 px-2.5 py-1 rounded-lg border border-pink-500/20">
+                <span className="w-2 h-2 rounded-full bg-pink-400 inline-block"></span>
+                <span>♀ Female</span>
+              </span>
+              <span className="font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                Avg: {weeklyAverage}/day
+              </span>
+            </div>
+          </div>
+
+          <div className="flex-1 w-full min-h-[300px] h-[360px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart 
+                data={attendanceData} 
+                margin={{ top: 10, right: 15, left: -10, bottom: 4 }} 
+                barGap={4}
+                barCategoryGap="24%"
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.6} />
+                <XAxis 
+                  dataKey="name" 
+                  stroke="#9CA3AF" 
+                  tickLine={{ stroke: '#6B7280' }}
+                  axisLine={{ stroke: '#6B7280', strokeWidth: 1.5 }}
+                  tick={{ fill: '#9CA3AF', fontSize: 12, fontWeight: 600 }} 
+                />
+                <YAxis 
+                  stroke="#9CA3AF" 
+                  tickLine={{ stroke: '#6B7280' }}
+                  axisLine={{ stroke: '#6B7280', strokeWidth: 1.5 }}
+                  tick={{ fill: '#9CA3AF', fontSize: 12, fontWeight: 500 }}
+                  domain={yAxisDomain}
+                  ticks={yAxisTicks}
+                  allowDecimals={false}
+                />
+                <Tooltip 
+                  cursor={{ fill: 'rgba(255, 255, 255, 0.04)' }}
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-[#0f172a] border border-gray-700/90 p-3.5 rounded-xl shadow-2xl text-xs space-y-2 min-w-[160px]">
+                          <div className="font-bold text-white border-b border-gray-800 pb-1.5 flex justify-between items-center">
+                            <span>{label}</span>
+                            <span className="text-gray-400 font-normal">{data.fullDate}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-blue-400 font-semibold">
+                            <span className="flex items-center gap-1">♂ Male</span>
+                            <span className="font-mono text-sm">{data.Male}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-pink-400 font-semibold">
+                            <span className="flex items-center gap-1">♀ Female</span>
+                            <span className="font-mono text-sm">{data.Female}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-emerald-400 font-bold border-t border-gray-800 pt-1.5">
+                            <span>Total Present</span>
+                            <span className="font-mono text-sm">{data.Total}</span>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar 
+                  dataKey="Male" 
+                  fill="#3B82F6" 
+                  radius={[4, 4, 0, 0]} 
+                  maxBarSize={32} 
+                  name="Male" 
+                />
+                <Bar 
+                  dataKey="Female" 
+                  fill="#EC4899" 
+                  radius={[4, 4, 0, 0]} 
+                  maxBarSize={32} 
+                  name="Female" 
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
-        {/* Quick Actions Panel */}
-        <div className="bg-surface p-6 rounded-xl shadow-lg border border-gray-800/80 flex flex-col justify-between">
-          <h2 className="text-base font-bold mb-4 text-text-primary tracking-tight">Quick Actions</h2>
-          <div className="space-y-3 my-auto">
+        {/* Quick Actions Panel - Larger, High-Visibility Buttons */}
+        <div className="bg-surface p-5 sm:p-6 rounded-xl shadow-lg border border-gray-800/80 flex flex-col justify-between">
+          <h2 className="text-base font-bold mb-3 text-text-primary tracking-tight">Quick Actions</h2>
+          <div className="space-y-2.5 my-auto">
             <button 
               onClick={() => onNavigate('members')} 
-              className="w-full bg-[#10b981] hover:bg-[#059669] text-white font-bold py-3 px-4 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#10b981] hover:bg-[#059669] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
             >
-              <UserPlusIcon className="h-5 w-5" />
+              <UserPlusIcon className="h-4.5 w-4.5" />
               <span>Add Member</span>
             </button>
             <button 
               onClick={() => onNavigate('fees')} 
-              className="w-full bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-3 px-4 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
             >
-              <ReceiptIcon className="h-5 w-5" />
+              <ReceiptIcon className="h-4.5 w-4.5" />
               <span>Record Payment</span>
             </button>
             <button 
               onClick={() => onNavigate('attendance')} 
-              className="w-full bg-[#eab308] hover:bg-[#ca8a04] text-white font-bold py-3 px-4 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#eab308] hover:bg-[#ca8a04] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
             >
-              <ClipboardListIcon className="h-5 w-5" />
+              <ClipboardListIcon className="h-4.5 w-4.5" />
               <span>Mark Attendance</span>
             </button>
             <button 
               onClick={() => onNavigate('dailyledger')} 
-              className="w-full bg-[#f97316] hover:bg-[#ea580c] text-white font-bold py-3 px-4 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#f97316] hover:bg-[#ea580c] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
             >
-              <LedgerIcon className="h-5 w-5" />
+              <LedgerIcon className="h-4.5 w-4.5" />
               <span>Daily Ledger</span>
             </button>
             <button 
               onClick={() => onNavigate('expenses')} 
-              className="w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-3 px-4 rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              className="w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
             >
-              <ExpenseIcon className="h-5 w-5" />
+              <ExpenseIcon className="h-4.5 w-4.5" />
               <span>Monthly Expense</span>
+            </button>
+            <button 
+              onClick={() => onNavigate('accessories')} 
+              className="w-full bg-[#ec4899] hover:bg-[#db2777] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
+            >
+              <AccessoriesIcon className="h-4.5 w-4.5" />
+              <span>Store Accessories</span>
+            </button>
+            <button 
+              onClick={() => onNavigate('staff')} 
+              className="w-full bg-[#14b8a6] hover:bg-[#0d9488] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
+            >
+              <StaffIcon className="h-4.5 w-4.5" />
+              <span>Staff & Payroll</span>
+            </button>
+            <button 
+              onClick={() => onNavigate('backup')} 
+              className="w-full bg-[#ef4444] hover:bg-[#dc2626] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
+            >
+              <BackupIcon className="h-4.5 w-4.5" />
+              <span>Backup & Restore</span>
             </button>
           </div>
         </div>
@@ -262,12 +454,22 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate, on
               </thead>
               <tbody className="divide-y divide-gray-800/50 text-sm">
                 {recentPayments.length > 0 ? (
-                  recentPayments.map(p => (
+                  recentPayments.map(p => {
+                    const member = nonArchivedMembers.find(m => m.id === p.memberId);
+                    return (
                     <tr key={p.id} className="hover:bg-secondary/60 transition-colors">
-                      <td className="p-3 font-semibold text-text-primary">{p.memberName}</td>
-                      <td className="p-3 text-text-secondary font-mono">{p.date}</td>
+                      <td className="p-3 font-semibold text-text-primary">
+                        <div className="flex items-center space-x-2">
+                          <span className="flex items-center gap-1.5">
+                            <span>{p.memberName}</span>
+                            {member && <ConsistentMemberStar member={member} size="sm" />}
+                          </span>
+                          {member && <GenderBadge gender={member.gender || 'Male'} size="sm" />}
+                        </div>
+                      </td>
+                      <td className="p-3 text-text-secondary font-mono">{formatDateDDMMYYYY(p.date)}</td>
                       <td className="p-3 text-emerald-500 dark:text-emerald-400 font-bold">
-                        Rs {p.amount}
+                        <MaskedAmount amount={p.amount} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
                       </td>
                       <td className="p-3">
                         <span className="bg-secondary text-text-secondary border border-gray-700/50 px-2.5 py-1 rounded-md text-xs font-semibold">
@@ -275,16 +477,22 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate, on
                         </span>
                       </td>
                       <td className="p-3 text-right">
-                        <button 
-                          onClick={() => setPaymentToDelete(p)}
-                          className="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
-                          title="Delete payment entry"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
+                        {role === 'Admin' ? (
+                          <button 
+                            onClick={() => setPaymentToDelete(p)}
+                            className="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                            title="Delete payment entry"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <span className="text-gray-500 text-[10px] px-2 py-0.5 bg-gray-800/40 rounded border border-gray-700/50 cursor-not-allowed select-none" title="Admin authority required to delete payments">
+                            Admin Only
+                          </span>
+                        )}
                       </td>
                     </tr>
-                  ))
+                  );})
                 ) : (
                   <tr>
                     <td colSpan={5} className="py-12 text-center text-text-secondary text-sm">
@@ -314,10 +522,15 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, onNavigate, on
                 {overdueMembers.length > 0 ? (
                   overdueMembers.map(m => (
                     <tr key={m.id} className="hover:bg-secondary/60 transition-colors">
-                      <td className="p-3 font-semibold text-text-primary">{m.name}</td>
-                      <td className="p-3 text-red-500 dark:text-red-400 font-mono text-xs font-bold">{m.expiryDate}</td>
+                      <td className="p-3 font-semibold text-text-primary">
+                        <div className="flex items-center space-x-2">
+                          <span>{m.name}</span>
+                          <GenderBadge gender={m.gender || 'Male'} size="sm" />
+                        </div>
+                      </td>
+                      <td className="p-3 text-red-500 dark:text-red-400 font-mono text-xs font-bold">{formatDateDDMMYYYY(m.expiryDate)}</td>
                       <td className="p-3 text-text-primary font-semibold">
-                        Rs {m.fee}
+                        <MaskedAmount amount={m.fee} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
                       </td>
                       <td className="p-3 text-right">
                         <button 

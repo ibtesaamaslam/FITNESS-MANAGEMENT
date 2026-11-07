@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Member, Payment } from '../types';
-import { DownloadIcon, TrashIcon, CloseIcon } from './icons';
-import { getLocalDateString, getLocalMonthString, isMemberArchived } from '../lib/dateUtils';
+import { Member, Payment, AccessorySale, Role } from '../types';
+import { DownloadIcon, TrashIcon, CloseIcon, CashIcon, BankIcon, PhonePayIcon, AccessoriesIcon, SearchIcon } from './icons';
+import { getLocalDateString, getLocalMonthString, isMemberArchived, formatDateDDMMYYYY } from '../lib/dateUtils';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { MaskedAmount } from './MaskedAmount';
+import { GenderBadge } from './Members';
+import { ConsistentMemberStar } from './ConsistentMemberStar';
 
 const isExpiringSoon = (expiryDate: string, days: number = 7): boolean => {
     const todayStr = getLocalDateString();
@@ -28,8 +30,10 @@ const CATEGORY_COLORS: { [key: string]: string } = {
 interface FeesProps {
   members: Member[];
   payments: Payment[];
+  accessorySales?: AccessorySale[];
   onToggleReminders: (memberId: string, enabled: boolean) => void;
   onDeletePayment: (id: string) => void;
+  role?: Role;
   isUnlocked?: boolean;
   onUnlockRequest?: () => void;
 }
@@ -53,7 +57,7 @@ const ConfirmPaymentDeleteModal: React.FC<{
                     <h3 className="text-xl font-bold text-text-primary">Delete Payment</h3>
                  </div>
                  <p className="mb-6 text-text-secondary">
-                    Are you sure you want to delete the payment of <span className="text-white font-bold">Rs {payment.amount}</span> for <span className="text-white font-bold">{payment.memberName}</span> dated {payment.date}?
+                    Are you sure you want to delete the payment of <span className="text-white font-bold">Rs {payment.amount}</span> for <span className="text-white font-bold">{payment.memberName}</span> dated {formatDateDDMMYYYY(payment.date)}?
                     <br/><br/>
                     <span className="text-xs text-yellow-500 bg-yellow-500/10 p-1 rounded border border-yellow-500/20">Note: This only removes the record from the ledger. It does not automatically change the member's status to "Unpaid".</span>
                  </p>
@@ -66,28 +70,187 @@ const ConfirmPaymentDeleteModal: React.FC<{
     );
 };
 
-const Fees: React.FC<FeesProps> = ({ members, payments, onToggleReminders, onDeletePayment, isUnlocked = false, onUnlockRequest }) => {
+const Fees: React.FC<FeesProps> = ({ members, payments, accessorySales, role = 'Admin', onToggleReminders, onDeletePayment, isUnlocked = false, onUnlockRequest }) => {
   const [viewMode, setViewMode] = useState<'status' | 'ledger'>('status');
   const [filterMonth, setFilterMonth] = useState<string>(getLocalMonthString());
   const [filterPlan, setFilterPlan] = useState<string>('All');
   const [filterStatus, setFilterStatus] = useState<string>('All');
+  const [filterGender, setFilterGender] = useState<'All' | 'Male' | 'Female'>('All');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   
   const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
 
   const filteredMembers = useMemo(() => {
-    return members.filter(member => {
-      if (isMemberArchived(member)) return false;
+    const rawTrimmed = searchQuery.trim();
+    const meetsDropdownFilters = (member: Member) => {
+      const isArchived = isMemberArchived(member);
+      const genderMatch = filterGender === 'All' || (member.gender || 'Male') === filterGender;
       const planMatch = filterPlan === 'All' || member.plan === filterPlan;
-      const statusMatch = filterStatus === 'All' || (filterStatus === 'Paid' && member.feePaid) || (filterStatus === 'Unpaid' && !member.feePaid);
-      return planMatch && statusMatch;
+      let statusMatch = true;
+      if (filterStatus === 'Paid') statusMatch = member.feePaid;
+      else if (filterStatus === 'Unpaid') statusMatch = !member.feePaid;
+      else if (filterStatus === 'Archived') statusMatch = isArchived;
+      return genderMatch && planMatch && statusMatch;
+    };
+
+    if (!rawTrimmed) {
+      return members.filter(meetsDropdownFilters);
+    }
+
+    const query = rawTrimmed.toLowerCase();
+    const isPureNumeric = /^#?\d+$/.test(query);
+    const queryDigits = query.replace(/\D/g, '');
+    const queryNum = queryDigits !== '' ? parseInt(queryDigits, 10) : NaN;
+
+    const matchesExactReg = (m: Member) => {
+      const reg = (m.registrationNo || '').trim().toLowerCase();
+      if (!reg) return false;
+      const regClean = reg.replace(/^#/, '');
+      const queryClean = query.replace(/^#/, '');
+      if (reg === query || regClean === queryClean) return true;
+
+      const regDigits = reg.replace(/\D/g, '');
+      if (!isNaN(queryNum) && regDigits !== '') {
+        const rNum = parseInt(regDigits, 10);
+        if (!isNaN(rNum) && rNum === queryNum) return true;
+      }
+      return false;
+    };
+
+    // When searching by numeric RegNo across ALL members
+    if (isPureNumeric) {
+      const exactRegMatches = members.filter(m => matchesExactReg(m));
+      if (exactRegMatches.length > 0) {
+        return exactRegMatches.filter(meetsDropdownFilters);
+      }
+
+      if (queryDigits.length >= 10) {
+        const phoneMatches = members.filter(m => {
+          const cleanPhone = (m.phone || '').replace(/\D/g, '');
+          return cleanPhone === queryDigits;
+        });
+        return phoneMatches.filter(meetsDropdownFilters);
+      }
+
+      return [];
+    }
+
+    // Standard text search by Name or Registration Number across ALL members
+    return members.filter(member => {
+      if (!meetsDropdownFilters(member)) return false;
+      const nameMatch = member.name.toLowerCase().includes(query);
+      const regMatch = member.registrationNo ? member.registrationNo.toLowerCase().includes(query) : false;
+      return nameMatch || regMatch;
     });
-  }, [members, filterPlan, filterStatus]);
+  }, [members, filterGender, filterPlan, filterStatus, searchQuery]);
   
   const paymentsInMonth = useMemo(() => {
+     if (filterMonth === 'all') return payments;
      return payments.filter(p => p.date.startsWith(filterMonth));
   }, [payments, filterMonth]);
   
   const totalRevenue = paymentsInMonth.reduce((sum, p) => sum + p.amount, 0);
+
+  const monthlyAccessorySales = useMemo(() => {
+     if (filterMonth === 'all') return accessorySales || [];
+     return (accessorySales || []).filter(s => s.date.startsWith(filterMonth));
+  }, [accessorySales, filterMonth]);
+
+  const accessoryRevenue = useMemo(() => {
+     return monthlyAccessorySales.reduce((sum, s) => sum + s.totalAmount, 0);
+  }, [monthlyAccessorySales]);
+
+  const accessoryProfit = useMemo(() => {
+     return monthlyAccessorySales.reduce((sum, s) => sum + s.totalProfit, 0);
+  }, [monthlyAccessorySales]);
+
+  const accessorySalesCount = monthlyAccessorySales.length;
+  const accessoryItemsCount = useMemo(() => {
+     return monthlyAccessorySales.reduce((sum, s) => sum + s.quantity, 0);
+  }, [monthlyAccessorySales]);
+
+  const feePayments = useMemo(() => {
+     return paymentsInMonth.filter(p => p.type !== 'Accessory');
+  }, [paymentsInMonth]);
+
+  const feeRevenue = useMemo(() => {
+     return feePayments.reduce((sum, p) => sum + p.amount, 0);
+  }, [feePayments]);
+
+  const filteredPayments = useMemo(() => {
+    const rawTrimmed = searchQuery.trim();
+    if (!rawTrimmed) return paymentsInMonth;
+
+    const query = rawTrimmed.toLowerCase();
+    const isPureNumeric = /^#?\d+$/.test(query);
+    const queryDigits = query.replace(/\D/g, '');
+    const queryNum = queryDigits !== '' ? parseInt(queryDigits, 10) : NaN;
+
+    const matchesExactReg = (regNo?: string) => {
+      if (!regNo) return false;
+      const reg = regNo.trim().toLowerCase();
+      const regClean = reg.replace(/^#/, '');
+      const queryClean = query.replace(/^#/, '');
+      if (reg === query || regClean === queryClean) return true;
+
+      const regDigits = reg.replace(/\D/g, '');
+      if (!isNaN(queryNum) && regDigits !== '') {
+        const rNum = parseInt(regDigits, 10);
+        if (!isNaN(rNum) && rNum === queryNum) return true;
+      }
+      return false;
+    };
+
+    if (isPureNumeric) {
+      const exactRegPayments = paymentsInMonth.filter(p => matchesExactReg(p.memberRegNo));
+      if (exactRegPayments.length > 0) {
+        return exactRegPayments;
+      }
+
+      if (queryDigits.length >= 10) {
+        const phonePayments = paymentsInMonth.filter(p => {
+          const memberForPayment = members.find(m => m.id === p.memberId);
+          const cleanPhone = (memberForPayment?.phone || '').replace(/\D/g, '');
+          return cleanPhone === queryDigits;
+        });
+        return phonePayments;
+      }
+
+      return [];
+    }
+
+    return paymentsInMonth.filter(p => {
+      const nameMatch = (p.memberName || '').toLowerCase().includes(query);
+      const regMatch = (p.memberRegNo || '').toLowerCase().includes(query);
+      const methodMatch = (p.method || '').toLowerCase().includes(query);
+      const notesMatch = (p.notes || '').toLowerCase().includes(query);
+      return nameMatch || regMatch || methodMatch || notesMatch;
+    });
+  }, [paymentsInMonth, searchQuery, members]);
+
+  const monthlyBreakdown = useMemo(() => {
+    let cash = 0;
+    let easyPaisa = 0;
+    let jazzCash = 0;
+    let bankTransfer = 0;
+
+    paymentsInMonth.forEach(p => {
+      const methodLower = (p.method || '').toLowerCase().replace(/\s+/g, '');
+      if (methodLower === 'cash') {
+        cash += p.amount;
+      } else if (methodLower === 'easypaisa') {
+        easyPaisa += p.amount;
+      } else if (methodLower === 'jazzcash') {
+        jazzCash += p.amount;
+      } else if (methodLower === 'banktransfer') {
+        bankTransfer += p.amount;
+      } else {
+        cash += p.amount;
+      }
+    });
+
+    return { cash, easyPaisa, jazzCash, bankTransfer };
+  }, [paymentsInMonth]);
   
   const monthlyRevenueData = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -191,66 +354,246 @@ const Fees: React.FC<FeesProps> = ({ members, payments, onToggleReminders, onDel
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <div className="md:col-span-3 bg-surface p-6 rounded-lg shadow-lg">
-          <div className="flex flex-wrap gap-4 items-center">
-            <div>
-              <label htmlFor="month" className="block text-sm font-medium text-text-secondary mb-1">Filter by Month</label>
+      {/* Filters & Export Control Bar */}
+      <div className="bg-surface border border-gray-800 rounded-2xl p-3.5 sm:p-4 shadow-lg mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Filters Group */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 bg-secondary/90 border border-gray-700/80 px-3 py-1.5 rounded-xl">
+            <label htmlFor="month" className="text-xs font-bold text-text-secondary uppercase tracking-wider whitespace-nowrap">
+              Filter:
+            </label>
+            {filterMonth !== 'all' ? (
               <input 
                 type="month" 
                 id="month"
                 value={filterMonth}
                 onChange={(e) => setFilterMonth(e.target.value)}
-                className="p-2 bg-secondary rounded-lg"
+                className="bg-transparent text-sm font-bold text-text-primary outline-none cursor-pointer"
               />
-            </div>
-            
-            {viewMode === 'status' && (
-                <>
-                    <div>
-                    <label htmlFor="plan" className="block text-sm font-medium text-text-secondary mb-1">Filter by Plan</label>
-                    <select id="plan" value={filterPlan} onChange={(e) => setFilterPlan(e.target.value)} className="p-2 bg-secondary rounded-lg">
-                        <option>All</option>
-                        <option>Monthly</option>
-                        <option>Quarterly</option>
-                        <option>Yearly</option>
-                    </select>
-                    </div>
-                    <div>
-                    <label htmlFor="status" className="block text-sm font-medium text-text-secondary mb-1">Filter by Status</label>
-                    <select id="status" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="p-2 bg-secondary rounded-lg">
-                        <option>All</option>
-                        <option>Paid</option>
-                        <option>Unpaid</option>
-                    </select>
-                    </div>
-                </>
+            ) : (
+              <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                All Time (Lifetime)
+              </span>
             )}
-            
-            <div className="self-end ml-auto">
-              <button onClick={handleExportCSV} className="bg-primary text-white font-bold py-2 px-4 rounded-lg hover:bg-primary-hover transition-colors flex items-center space-x-2">
-                <DownloadIcon />
-                <span>Export CSV</span>
+            <div className="flex items-center gap-1 border-l border-gray-700/80 pl-2">
+              <button
+                type="button"
+                onClick={() => setFilterMonth(getLocalMonthString())}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                  filterMonth === getLocalMonthString()
+                    ? 'bg-primary text-white'
+                    : 'text-text-secondary hover:text-white bg-secondary/80'
+                }`}
+                title="View current month"
+              >
+                Current
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMonth('all')}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                  filterMonth === 'all'
+                    ? 'bg-primary text-white'
+                    : 'text-text-secondary hover:text-white bg-secondary/80'
+                }`}
+                title="View all historical transactions of all months"
+              >
+                All-Time
               </button>
             </div>
           </div>
+          
+          {viewMode === 'status' && (
+            <>
+              <div className="flex items-center gap-2 bg-secondary/90 border border-gray-700/80 px-3 py-1.5 rounded-xl">
+                <label htmlFor="gender-filter" className="text-xs font-bold text-text-secondary uppercase tracking-wider whitespace-nowrap">
+                  Gender:
+                </label>
+                <select 
+                  id="gender-filter" 
+                  value={filterGender} 
+                  onChange={(e) => setFilterGender(e.target.value as 'All' | 'Male' | 'Female')} 
+                  className="bg-transparent text-sm font-bold text-text-primary outline-none cursor-pointer px-1 py-0.5 rounded"
+                >
+                  <option value="All">All Genders</option>
+                  <option value="Male">♂ Male</option>
+                  <option value="Female">♀ Female</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 bg-secondary/90 border border-gray-700/80 px-3 py-1.5 rounded-xl">
+                <label htmlFor="plan" className="text-xs font-bold text-text-secondary uppercase tracking-wider whitespace-nowrap">
+                  Plan:
+                </label>
+                <select 
+                  id="plan" 
+                  value={filterPlan} 
+                  onChange={(e) => setFilterPlan(e.target.value)} 
+                  className="bg-transparent text-sm font-bold text-text-primary outline-none cursor-pointer px-1 py-0.5 rounded"
+                >
+                  <option value="All">All Plans</option>
+                  <option value="Monthly">Monthly</option>
+                  <option value="Quarterly">Quarterly</option>
+                  <option value="Yearly">Yearly</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 bg-secondary/90 border border-gray-700/80 px-3 py-1.5 rounded-xl">
+                <label htmlFor="status" className="text-xs font-bold text-text-secondary uppercase tracking-wider whitespace-nowrap">
+                  Status:
+                </label>
+                <select 
+                  id="status" 
+                  value={filterStatus} 
+                  onChange={(e) => setFilterStatus(e.target.value)} 
+                  className="bg-transparent text-sm font-bold text-text-primary outline-none cursor-pointer px-1 py-0.5 rounded"
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Unpaid">Unpaid</option>
+                  <option value="Archived">Inactive (5+ mo)</option>
+                </select>
+              </div>
+            </>
+          )}
         </div>
-        <div className="bg-surface p-6 rounded-lg shadow-lg flex flex-col justify-center items-center">
-          <p className="text-text-secondary">Revenue for {new Date(filterMonth + '-02').toLocaleString('default', { month: 'long' })}</p>
-          <div className="text-3xl font-bold text-primary">
-            <MaskedAmount amount={totalRevenue} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
+
+        {/* Export Button */}
+        <button 
+          onClick={handleExportCSV} 
+          className="bg-[#10b981] hover:bg-[#059669] text-white font-bold h-11 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 group text-xs border border-[#10b981]/60"
+          title="Export to CSV"
+        >
+          <svg className="w-4 h-4 text-white group-hover:translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span className="tracking-wide">Export CSV</span>
+        </button>
+      </div>
+
+      {/* 5 Monthly Revenue & Payment Method Summary Boxes */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        {/* Total Revenue Card */}
+        <div className="bg-surface p-4 rounded-xl shadow-lg border border-emerald-500/40 bg-emerald-950/20 flex flex-col justify-between">
+          <div>
+            <p className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider">
+              Total Revenue ({filterMonth === 'all' ? 'All Time' : new Date(filterMonth + '-02').toLocaleString('default', { month: 'short' })})
+            </p>
+            <div className="text-2xl font-black text-emerald-400 mt-1">
+              <MaskedAmount amount={totalRevenue} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
+            </div>
+          </div>
+          <div className="mt-3 pt-2 border-t border-emerald-500/20 text-[11px] space-y-1 text-text-secondary font-medium">
+            <div className="flex justify-between">
+              <span>Fees ({feePayments.length}):</span>
+              <span className="text-blue-400 font-mono"><MaskedAmount amount={feeRevenue} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} /></span>
+            </div>
+            <div className="flex justify-between">
+              <span>Acc ({accessorySalesCount}):</span>
+              <span className="text-teal-400 font-mono"><MaskedAmount amount={accessoryRevenue} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} /></span>
+            </div>
+          </div>
+        </div>
+
+        {/* Cash */}
+        <div className="bg-surface p-4 rounded-xl shadow-lg border border-emerald-500/30 bg-emerald-950/10 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-emerald-300 uppercase tracking-wider mb-1">Cash</p>
+            <div className="text-xl font-bold text-emerald-400">
+              <MaskedAmount amount={monthlyBreakdown.cash} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
+            </div>
+          </div>
+          <div className="p-2.5 bg-emerald-500/20 border border-emerald-500/40 rounded-full text-emerald-400 shadow-sm">
+            <CashIcon className="h-4 w-4" />
+          </div>
+        </div>
+
+        {/* Easy Paisa */}
+        <div className="bg-surface p-4 rounded-xl shadow-lg border border-cyan-500/30 bg-cyan-950/10 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-cyan-300 uppercase tracking-wider mb-1">Easy Paisa</p>
+            <div className="text-xl font-bold text-cyan-400">
+              <MaskedAmount amount={monthlyBreakdown.easyPaisa} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
+            </div>
+          </div>
+          <div className="p-2.5 bg-cyan-500/20 border border-cyan-500/40 rounded-full text-cyan-400 shadow-sm">
+            <PhonePayIcon className="h-4 w-4" />
+          </div>
+        </div>
+
+        {/* Jazz Cash */}
+        <div className="bg-surface p-4 rounded-xl shadow-lg border border-orange-500/30 bg-orange-950/10 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-orange-300 uppercase tracking-wider mb-1">Jazz Cash</p>
+            <div className="text-xl font-bold text-orange-400">
+              <MaskedAmount amount={monthlyBreakdown.jazzCash} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
+            </div>
+          </div>
+          <div className="p-2.5 bg-orange-500/20 border border-orange-500/40 rounded-full text-orange-400 shadow-sm">
+            <PhonePayIcon className="h-4 w-4" />
+          </div>
+        </div>
+
+        {/* Bank Transfer */}
+        <div className="bg-surface p-4 rounded-xl shadow-lg border border-purple-500/30 bg-purple-950/10 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-purple-300 uppercase tracking-wider mb-1">Bank Transfer</p>
+            <div className="text-xl font-bold text-purple-400">
+              <MaskedAmount amount={monthlyBreakdown.bankTransfer} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
+            </div>
+          </div>
+          <div className="p-2.5 bg-purple-500/20 border border-purple-500/40 rounded-full text-purple-400 shadow-sm">
+            <BankIcon className="h-4 w-4" />
           </div>
         </div>
       </div>
       
       {viewMode === 'status' ? (
-        <div className="bg-surface rounded-lg shadow-lg overflow-hidden">
+        <div className="bg-surface rounded-xl shadow-lg border border-gray-800 overflow-hidden">
+          {/* Search Bar & Table Header */}
+          <div className="p-3.5 sm:p-4 border-b border-gray-800/80 bg-secondary/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="relative w-full sm:w-[500px] md:w-[620px] lg:w-[720px]">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                <SearchIcon className="h-5 w-5" />
+              </div>
+              <input 
+                id="fee-member-search"
+                type="text"
+                placeholder="Search by name or number (e.g. 001, phone)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-11 py-3 bg-secondary/90 border-2 border-gray-700 hover:border-gray-600 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl text-base text-text-primary placeholder-text-secondary/70 focus:outline-none transition-all shadow-md font-medium"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                  title="Clear search"
+                >
+                  <CloseIcon className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2.5 text-xs text-text-secondary w-full sm:w-auto justify-between sm:justify-end">
+              {searchQuery.trim() && (
+                <span className="text-primary font-semibold bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20">
+                  Matches: {filteredMembers.length}
+                </span>
+              )}
+              <span className="text-gray-400">
+                Showing <strong className="text-text-primary font-mono">{filteredMembers.length}</strong> of <strong className="text-text-primary font-mono">{members.length}</strong> members
+              </span>
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-secondary">
                 <tr>
                   <th className="p-4">RegNo</th>
                   <th className="p-4">Member</th>
+                  <th className="p-4">Gender</th>
                   <th className="p-4">Plan</th>
                   <th className="p-4">Fee Amount</th>
                   <th className="p-4">Status</th>
@@ -259,47 +602,96 @@ const Fees: React.FC<FeesProps> = ({ members, payments, onToggleReminders, onDel
                 </tr>
               </thead>
               <tbody>
-                {filteredMembers.map(member => {
-                  const todayStr = getLocalDateString();
-                  const isExpired = new Date(member.expiryDate) < new Date(todayStr);
-                  const needsReminder = (!member.feePaid || isExpiringSoon(member.expiryDate)) && (member.remindersEnabled ?? true);
-                  return (
-                    <tr key={member.id} className={`border-b border-secondary hover:bg-gray-700/50 ${!member.feePaid || isExpired ? 'bg-red-900/40 border-l-4 border-l-red-500 text-red-100' : ''}`}>
-                      <td className="p-4 font-mono text-text-secondary">{member.registrationNo}</td>
-                      <td className="p-4 font-medium">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span>{member.name}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${CATEGORY_COLORS[member.category || 'Strength'] || 'bg-gray-500/20 text-gray-400'}`}>
-                            {member.category || 'Strength'}
-                          </span>
+                {filteredMembers.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-text-secondary">
+                      {searchQuery.trim() ? (
+                        <div className="space-y-2 py-4">
+                          <p className="text-base text-gray-300 font-medium">
+                            No members found matching &ldquo;<span className="text-primary font-semibold">{searchQuery}</span>&rdquo;
+                          </p>
+                          <p className="text-xs text-gray-400 max-w-md mx-auto">
+                            Check for typos or try searching by member name, registration number (e.g. 001, 002), or phone number.
+                          </p>
+                          <button 
+                            onClick={() => setSearchQuery('')}
+                            className="mt-3 inline-flex items-center gap-1.5 text-xs px-3.5 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary font-semibold rounded-lg border border-primary/30 transition-colors cursor-pointer"
+                          >
+                            <CloseIcon className="h-3.5 w-3.5" />
+                            <span>Clear Search</span>
+                          </button>
                         </div>
-                      </td>
-                      <td className="p-4">{member.plan}</td>
-                      <td className="p-4">
-                        Rs {member.fee}
-                      </td>
-                      <td className="p-4">
-                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${member.feePaid ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                          {member.feePaid ? 'Paid' : 'Unpaid'}
-                        </span>
-                      </td>
-                      <td className={`p-4 ${isExpired ? 'text-red-400 font-bold' : ''}`}>
-                        {member.expiryDate} {isExpired && "(Expired)"}
-                      </td>
-                      <td className="p-4">
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            checked={member.remindersEnabled ?? true} 
-                            onChange={(e) => onToggleReminders(member.id, e.target.checked)}
-                            className="sr-only peer" 
-                          />
-                          <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-4 peer-focus:ring-primary-hover/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                        </label>
-                      </td>
-                    </tr>
-                  );
-                })}
+                      ) : (
+                        <div className="py-4">
+                          <p className="text-gray-400">No members match the selected filters.</p>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredMembers.map(member => {
+                    const todayStr = getLocalDateString();
+                    const isArchived = isMemberArchived(member);
+                    const isExpired = new Date(member.expiryDate) < new Date(todayStr);
+                    const needsReminder = (!member.feePaid || isExpiringSoon(member.expiryDate)) && (member.remindersEnabled ?? true);
+                    return (
+                      <tr key={member.id} className={`border-b border-secondary hover:bg-gray-700/50 ${!member.feePaid || isExpired ? 'bg-red-900/40 border-l-4 border-l-red-500 text-red-100' : ''}`}>
+                        <td className="p-4 font-mono text-emerald-400 font-bold">
+                          <span className="px-2 py-1 rounded bg-secondary/80 border border-gray-700 font-mono text-xs">
+                            #{member.registrationNo}
+                          </span>
+                        </td>
+                        <td className="p-4 font-medium">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="flex items-center gap-1.5">
+                              <span>{member.name}</span>
+                              <ConsistentMemberStar member={member} size="sm" />
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${CATEGORY_COLORS[member.category || 'Strength'] || 'bg-gray-500/20 text-gray-400'}`}>
+                              {member.category || 'Strength'}
+                            </span>
+                          </div>
+                          {member.phone && (
+                            <p className="text-xs text-text-secondary font-mono mt-0.5 tracking-tight">{member.phone}</p>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          <GenderBadge gender={member.gender || 'Male'} size="sm" />
+                        </td>
+                        <td className="p-4">{member.plan}</td>
+                        <td className="p-4">
+                          <MaskedAmount amount={member.fee} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
+                        </td>
+                        <td className="p-4">
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${member.feePaid ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                              {member.feePaid ? 'Paid' : 'Unpaid'}
+                            </span>
+                            {isArchived && (
+                              <span className="text-[10px] text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 font-medium">
+                                Inactive (5+ mo)
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className={`p-4 ${isExpired ? 'text-red-400 font-bold' : ''}`}>
+                          {formatDateDDMMYYYY(member.expiryDate)} {isExpired && "(Expired)"}
+                        </td>
+                        <td className="p-4">
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              checked={member.remindersEnabled ?? true} 
+                              onChange={(e) => onToggleReminders(member.id, e.target.checked)}
+                              className="sr-only peer" 
+                            />
+                            <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-4 peer-focus:ring-primary-hover/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                          </label>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -307,7 +699,7 @@ const Fees: React.FC<FeesProps> = ({ members, payments, onToggleReminders, onDel
       ) : (
         <div className="space-y-6">
           {/* Revenue Trends Chart */}
-          <div className="bg-surface border border-gray-800 p-6 rounded-lg shadow-lg">
+          <div className="bg-surface border border-gray-800 p-6 rounded-lg shadow-lg relative overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h3 className="text-xl font-bold text-text-primary">Monthly Revenue Trend</h3>
@@ -318,48 +710,73 @@ const Fees: React.FC<FeesProps> = ({ members, payments, onToggleReminders, onDel
               </span>
             </div>
             
-            <div className="h-64 mt-6">
+            <div className="h-64 mt-6 relative">
               {monthlyRevenueData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={monthlyRevenueData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.25} vertical={false} />
-                    <XAxis 
-                      dataKey="label" 
-                      stroke="#9ca3af" 
-                      fontSize={11} 
-                      tickLine={false} 
-                      axisLine={false}
-                      dy={10}
-                    />
-                    <YAxis 
-                      stroke="#9ca3af" 
-                      fontSize={11} 
-                      tickLine={false} 
-                      axisLine={false}
-                      tickFormatter={(v) => `Rs ${(v / 1000).toFixed(0)}k`}
-                      dx={-10}
-                    />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151', borderRadius: '12px' }} 
-                      labelStyle={{ fontWeight: 'bold', color: '#f3f4f6' }}
-                      formatter={(value: any) => [`Rs ${Number(value).toLocaleString()}`, 'Revenue']}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="Revenue" 
-                      stroke="#10b981" 
-                      strokeWidth={3} 
-                      fillOpacity={1} 
-                      fill="url(#colorRevenue)" 
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={monthlyRevenueData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.25} vertical={false} />
+                      <XAxis 
+                        dataKey="label" 
+                        stroke="#9ca3af" 
+                        fontSize={11} 
+                        tickLine={false} 
+                        axisLine={false}
+                        dy={10}
+                      />
+                      <YAxis 
+                        stroke="#9ca3af" 
+                        fontSize={11} 
+                        tickLine={false} 
+                        axisLine={false}
+                        tickFormatter={(v) => isUnlocked ? `Rs ${(v / 1000).toFixed(0)}k` : '••••'}
+                        dx={-10}
+                      />
+                      {isUnlocked && (
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151', borderRadius: '12px' }} 
+                          labelStyle={{ fontWeight: 'bold', color: '#f3f4f6' }}
+                          formatter={(value: any) => [`Rs ${Number(value).toLocaleString()}`, 'Revenue']}
+                        />
+                      )}
+                      <Area 
+                        type="monotone" 
+                        dataKey="Revenue" 
+                        stroke="#10b981" 
+                        strokeWidth={3} 
+                        fillOpacity={1} 
+                        fill="url(#colorRevenue)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+
+                  {!isUnlocked && (
+                    <div 
+                      onClick={onUnlockRequest}
+                      className="absolute inset-0 bg-surface/85 backdrop-blur-md rounded-xl flex flex-col items-center justify-center p-6 cursor-pointer border border-dashed border-gray-700/80 hover:border-primary/60 transition-all group z-10"
+                      title="Click to unlock financial data"
+                    >
+                      <div className="p-3 bg-secondary/80 rounded-2xl border border-gray-700 group-hover:border-primary/50 text-amber-400 group-hover:scale-110 transition-all shadow-lg mb-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </div>
+                      <p className="text-sm font-bold text-text-primary mb-1">Monthly Revenue Amounts Hidden</p>
+                      <p className="text-xs text-text-secondary text-center max-w-sm mb-3">
+                        Trend amounts and financial analytics are locked for privacy. Click to enter your owner password to reveal.
+                      </p>
+                      <span className="px-3.5 py-1.5 rounded-lg bg-primary/20 text-primary border border-primary/40 text-xs font-semibold group-hover:bg-primary group-hover:text-white transition-all">
+                        Unlock Financial Data
+                      </span>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="flex h-full items-center justify-center text-text-secondary italic">
                   No payment transaction entries recorded yet to display trend.
@@ -369,7 +786,44 @@ const Fees: React.FC<FeesProps> = ({ members, payments, onToggleReminders, onDel
           </div>
 
           {/* Historical Table */}
-          <div className="bg-surface rounded-lg shadow-lg overflow-hidden">
+          <div className="bg-surface rounded-xl shadow-lg border border-gray-800 overflow-hidden">
+            {/* Search Bar & Table Header for Ledger */}
+            <div className="p-3.5 sm:p-4 border-b border-gray-800/80 bg-secondary/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="relative w-full sm:w-[500px] md:w-[620px] lg:w-[720px]">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                  <SearchIcon className="h-5 w-5" />
+                </div>
+                <input 
+                  id="fee-ledger-search"
+                  type="text"
+                  placeholder="Search ledger by name, Reg No, or method..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-11 py-3 bg-secondary/90 border-2 border-gray-700 hover:border-gray-600 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl text-base text-text-primary placeholder-text-secondary/70 focus:outline-none transition-all shadow-md font-medium"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                    title="Clear search"
+                  >
+                    <CloseIcon className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2.5 text-xs text-text-secondary w-full sm:w-auto justify-between sm:justify-end">
+                {searchQuery.trim() && (
+                  <span className="text-primary font-semibold bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20">
+                    Matches: {filteredPayments.length}
+                  </span>
+                )}
+                <span className="text-gray-400">
+                  Showing <strong className="text-text-primary font-mono">{filteredPayments.length}</strong> of <strong className="text-text-primary font-mono">{paymentsInMonth.length}</strong> payments ({filterMonth === 'all' ? 'All Time' : new Date(filterMonth + '-02').toLocaleString('default', { month: 'short' })})
+                </span>
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead className="bg-secondary">
@@ -382,35 +836,57 @@ const Fees: React.FC<FeesProps> = ({ members, payments, onToggleReminders, onDel
                   </tr>
                 </thead>
                 <tbody>
-                  {paymentsInMonth.length > 0 ? (
-                    paymentsInMonth.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(payment => {
-                      const memberForPayment = members.find(m => m.id === payment.memberId);
+                  {filteredPayments.length > 0 ? (
+                    filteredPayments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(payment => {
+                      const isAccessory = payment.type === 'Accessory' || payment.memberRegNo === 'ACC';
+                      const memberForPayment = members.find(m => m.id === payment.memberId || (payment.memberRegNo && m.registrationNo === payment.memberRegNo));
                       const category = memberForPayment ? memberForPayment.category : 'Strength';
                       return (
                         <tr key={payment.id} className="border-b border-secondary hover:bg-gray-700/50">
-                          <td className="p-4">{payment.date}</td>
+                          <td className="p-4 font-mono text-text-secondary text-xs">{formatDateDDMMYYYY(payment.date)}</td>
                           <td className="p-4 font-medium">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span>{payment.memberName}</span>
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${CATEGORY_COLORS[category || 'Strength'] || 'bg-gray-500/20 text-gray-400'}`}>
-                                {category || 'Strength'}
+                              <span className="flex items-center gap-1.5">
+                                <span>{payment.memberName}</span>
+                                {!isAccessory && memberForPayment && (
+                                  <ConsistentMemberStar member={memberForPayment} size="sm" />
+                                )}
                               </span>
+                              {!isAccessory && memberForPayment && (
+                                <GenderBadge gender={memberForPayment.gender || 'Male'} size="sm" />
+                              )}
+                              {isAccessory ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                  Accessory
+                                </span>
+                              ) : (
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${CATEGORY_COLORS[category || 'Strength'] || 'bg-gray-500/20 text-gray-400'}`}>
+                                  {category || 'Strength'}
+                                </span>
+                              )}
                             </div>
+                            {payment.notes && <p className="text-xs text-text-secondary mt-0.5">{payment.notes}</p>}
                           </td>
-                          <td className="p-4 text-green-400 font-bold">
-                            Rs {payment.amount}
+                          <td className="p-4 text-emerald-400 font-bold">
+                            <MaskedAmount amount={payment.amount} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
                           </td>
                           <td className="p-4">
-                            <span className="bg-gray-700 px-2 py-1 rounded text-sm">{payment.method}</span>
+                            <span className="bg-gray-700/80 px-2.5 py-1 rounded-full text-xs font-semibold">{payment.method}</span>
                           </td>
                           <td className="p-4 text-right">
-                            <button 
-                              onClick={() => setPaymentToDelete(payment)}
-                              className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-2 rounded transition-colors"
-                              title="Delete Payment Record"
-                            >
-                              <TrashIcon />
-                            </button>
+                            {role === 'Admin' ? (
+                              <button 
+                                onClick={() => setPaymentToDelete(payment)}
+                                className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-2 rounded transition-colors cursor-pointer"
+                                title="Delete Payment Record"
+                              >
+                                <TrashIcon />
+                              </button>
+                            ) : (
+                              <span className="text-gray-500 text-[11px] px-2 py-1 bg-gray-800/40 rounded border border-gray-700/50 cursor-not-allowed select-none" title="Admin authority required to delete payment records">
+                                Admin Only
+                              </span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -418,7 +894,22 @@ const Fees: React.FC<FeesProps> = ({ members, payments, onToggleReminders, onDel
                   ) : (
                     <tr>
                       <td colSpan={5} className="p-8 text-center text-text-secondary">
-                        No payments recorded for {new Date(filterMonth + '-02').toLocaleString('default', { month: 'long', year: 'numeric' })}.
+                        {searchQuery.trim() ? (
+                          <div className="space-y-2 py-4">
+                            <p className="text-base text-gray-300 font-medium">
+                              No payment records found matching &ldquo;<span className="text-primary font-semibold">{searchQuery}</span>&rdquo;
+                            </p>
+                            <button 
+                              onClick={() => setSearchQuery('')}
+                              className="mt-3 inline-flex items-center gap-1.5 text-xs px-3.5 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary font-semibold rounded-lg border border-primary/30 transition-colors cursor-pointer"
+                            >
+                              <CloseIcon className="h-3.5 w-3.5" />
+                              <span>Clear Search</span>
+                            </button>
+                          </div>
+                        ) : (
+                          `No payments recorded for ${new Date(filterMonth + '-02').toLocaleString('default', { month: 'long', year: 'numeric' })}.`
+                        )}
                       </td>
                     </tr>
                   )}

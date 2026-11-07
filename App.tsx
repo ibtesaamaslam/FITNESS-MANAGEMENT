@@ -9,6 +9,9 @@ import Report from './components/Report';
 import DailyLedger from './components/DailyLedger';
 import Archive from './components/Archive';
 import MonthlyExpense from './components/MonthlyExpense';
+import { Accessories } from './components/Accessories';
+import { Staff } from './components/Staff';
+import { BackupRestore } from './components/BackupRestore';
 import Login from './components/Login';
 import ToastContainer from './components/Toast';
 import { useGymData } from './hooks/useGymData';
@@ -16,7 +19,7 @@ import { useFinancialPrivacy } from './hooks/useFinancialPrivacy';
 import { FinancialSecurityModal } from './components/FinancialSecurityModal';
 import { getLocalDateString, getLocalMonthString, isMemberArchived } from './lib/dateUtils';
 import { NotificationMessageBox } from './components/NotificationMessageBox';
-import { DashboardIcon, MembersIcon, FeesIcon, AttendanceIcon, DocumentReportIcon, MenuIcon, CloseIcon, LogOutIcon, LedgerIcon, ExpenseIcon, LockIcon, ArchiveIcon } from './components/icons';
+import { DashboardIcon, MembersIcon, FeesIcon, AttendanceIcon, DocumentReportIcon, MenuIcon, CloseIcon, LogOutIcon, LedgerIcon, ExpenseIcon, LockIcon, ArchiveIcon, AccessoriesIcon, StaffIcon, BackupIcon } from './components/icons';
 import { DB_CONFIG } from './lib/dbConfig';
 
 const NavLink: React.FC<{
@@ -24,16 +27,17 @@ const NavLink: React.FC<{
   label: string;
   isActive: boolean;
   onClick: () => void;
-}> = ({ icon, label, isActive, onClick }) => (
+  variant?: 'default' | 'red';
+}> = ({ icon, label, isActive, onClick, variant = 'default' }) => (
     <button
         onClick={onClick}
         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-semibold transition-all cursor-pointer ${
             isActive 
-              ? 'bg-[#10b981] text-white shadow-lg font-bold' 
-              : 'text-text-secondary hover:bg-secondary hover:text-text-primary'
+              ? (variant === 'red' ? 'bg-[#ef4444] text-white shadow-lg shadow-red-950/40 font-bold' : 'bg-[#10b981] text-white shadow-lg font-bold')
+              : (variant === 'red' ? 'text-red-400 hover:bg-red-500/15 hover:text-red-300' : 'text-text-secondary hover:bg-secondary hover:text-text-primary')
         }`}
     >
-        <span className={isActive ? 'text-white' : 'text-text-secondary'}>{icon}</span>
+        <span className={isActive ? 'text-white' : (variant === 'red' ? 'text-red-400' : 'text-text-secondary')}>{icon}</span>
         <span className="text-sm">{label}</span>
     </button>
 );
@@ -53,6 +57,10 @@ const App: React.FC = () => {
     });
 
     const handleUpdateGymName = (newName: string) => {
+        if (role !== 'Admin') {
+            showToast('Only Admin can change the Gym Name', 'error');
+            return;
+        }
         setGymName(newName);
         localStorage.setItem('gym_name', newName);
     };
@@ -71,6 +79,7 @@ const App: React.FC = () => {
         localStorage.setItem('theme', theme);
     }, [theme]);
 
+
     // Notification State
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
@@ -79,14 +88,38 @@ const App: React.FC = () => {
         members, 
         payments, 
         expenses,
+        accessories,
+        accessorySales,
+        staff,
+        staffPayrolls,
+        staffAttendanceLogs,
         addMember, 
         updateMember, 
         deleteMember, 
         deletePayment,
         addExpense,
         deleteExpense,
-        updateAttendance, 
-        toggleReminder 
+        addAccessoryItem,
+        updateAccessoryItem,
+        deleteAccessoryItem,
+        sellAccessoryItem,
+        deleteAccessorySale,
+        updateAttendance,
+        batchUpdateAttendance,
+        clearAttendanceForDate,
+        updateCheckOut,
+        checkOutAllActiveMembers,
+        toggleReminder,
+        addStaffMember,
+        updateStaffMember,
+        deleteStaffMember,
+        assignMemberToTrainer,
+        unassignMemberFromTrainer,
+        recordStaffPayroll,
+        deleteStaffPayroll,
+        recordStaffAttendance,
+        deleteStaffAttendanceLog,
+        restoreAllData
     } = useGymData();
 
     // Financial Privacy Hook
@@ -148,14 +181,37 @@ const App: React.FC = () => {
     }, [deleteMember, showToast]);
 
     const handleDeletePayment = useCallback((id: string) => {
+        if (role !== 'Admin') {
+            showToast('Only Admin can delete or undo transactions', 'error');
+            return;
+        }
         deletePayment(id);
         showToast('Payment record deleted successfully', 'info');
-    }, [deletePayment, showToast]);
+    }, [deletePayment, role, showToast]);
 
-    const handleUpdateAttendance = useCallback((memberId: string, date: string, present: boolean) => {
-        updateAttendance(memberId, date, present);
-        // Optional: show toast for attendance? Might be too spammy.
+    const handleUpdateAttendance = useCallback((memberId: string, date: string, present: boolean, customTime?: string, customCheckOutTime?: string) => {
+        updateAttendance(memberId, date, present, customTime, customCheckOutTime);
     }, [updateAttendance]);
+
+    const handleBatchUpdateAttendance = useCallback((memberIds: string[], date: string, present: boolean) => {
+        batchUpdateAttendance(memberIds, date, present);
+        showToast(present ? `Marked ${memberIds.length} members present` : `Marked ${memberIds.length} members absent`, 'info');
+    }, [batchUpdateAttendance, showToast]);
+
+    const handleClearAttendanceForDate = useCallback((date: string) => {
+        clearAttendanceForDate(date);
+        showToast('Reset all attendance records for date to absent', 'info');
+    }, [clearAttendanceForDate, showToast]);
+
+    const handleUpdateCheckOut = useCallback((memberId: string, date: string, checkOutTime?: string) => {
+        updateCheckOut(memberId, date, checkOutTime);
+        showToast('Check-out timestamp updated', 'info');
+    }, [updateCheckOut, showToast]);
+
+    const handleCheckOutAllActiveMembers = useCallback((date: string) => {
+        checkOutAllActiveMembers(date);
+        showToast('All active members checked out successfully!', 'success');
+    }, [checkOutAllActiveMembers, showToast]);
     
     const handleToggleReminders = useCallback((memberId: string, enabled: boolean) => {
         toggleReminder(memberId, enabled);
@@ -168,14 +224,27 @@ const App: React.FC = () => {
     }, [addExpense, showToast]);
 
     const handleDeleteExpense = useCallback((id: string) => {
+        if (role !== 'Admin') {
+            showToast('Only Admin can delete or undo transactions', 'error');
+            return;
+        }
         deleteExpense(id);
         showToast(`Expense record removed`, 'info');
-    }, [deleteExpense, showToast]);
+    }, [deleteExpense, role, showToast]);
+
+    const handleDeleteAccessorySale = useCallback((saleId: string) => {
+        if (role !== 'Admin') {
+            showToast('Only Admin can delete or undo transactions', 'error');
+            return;
+        }
+        deleteAccessorySale(saleId);
+        showToast('Sale refunded and transaction removed', 'info');
+    }, [deleteAccessorySale, role, showToast]);
 
     const handleLogin = (selectedRole: Role) => {
         setRole(selectedRole);
         setIsLoggedIn(true);
-        setView(selectedRole === 'Member' ? 'attendance' : 'dashboard');
+        setView('dashboard');
         showToast(`Welcome back, ${selectedRole}!`);
     };
 
@@ -185,19 +254,12 @@ const App: React.FC = () => {
         setView('dashboard');
     };
 
-    // Ensure correct view based on role changes
-    useEffect(() => {
-        if(role === 'Member' && view !== 'attendance') {
-            setView('attendance');
-        }
-    }, [role, view]);
-
     if (!isLoggedIn) {
         return (
-            <>
+            <div className="w-full h-full min-h-full flex-1 flex flex-col items-center justify-center bg-background">
                 <Login onLogin={handleLogin} gymName={gymName} onUpdateGymName={handleUpdateGymName} />
                 <ToastContainer toasts={toasts} removeToast={removeToast} />
-            </>
+            </div>
         );
     }
 
@@ -205,27 +267,98 @@ const App: React.FC = () => {
         switch (view) {
 
             case 'members':
-                return <Members members={members} payments={payments} onAddMember={handleAddMember} onUpdateMember={handleUpdateMember} onDeleteMember={handleDeleteMember} onWarning={(msg) => showToast(msg, 'error')} isUnlocked={isUnlocked} onUnlockRequest={openUnlockModal} />;
+                return <Members members={members} payments={payments} role={role} onAddMember={handleAddMember} onUpdateMember={handleUpdateMember} onDeleteMember={handleDeleteMember} onWarning={(msg) => showToast(msg, 'error')} isUnlocked={isUnlocked} onUnlockRequest={openUnlockModal} />;
             case 'fees':
-                return <Fees members={members} payments={payments} onToggleReminders={handleToggleReminders} onDeletePayment={handleDeletePayment} isUnlocked={isUnlocked} onUnlockRequest={openUnlockModal} />;
+                return <Fees members={members} payments={payments} accessorySales={accessorySales} role={role} onToggleReminders={handleToggleReminders} onDeletePayment={handleDeletePayment} isUnlocked={isUnlocked} onUnlockRequest={openUnlockModal} />;
             case 'attendance':
-                return <Attendance members={members} role={role} onUpdateAttendance={handleUpdateAttendance} onWarning={(msg) => showToast(msg, 'error')} />;
+                return (
+                    <Attendance
+                        members={members}
+                        role={role}
+                        onUpdateAttendance={handleUpdateAttendance}
+                        onBatchUpdateAttendance={handleBatchUpdateAttendance}
+                        onClearAttendanceForDate={handleClearAttendanceForDate}
+                        onUpdateCheckOut={handleUpdateCheckOut}
+                        onCheckOutAllActive={handleCheckOutAllActiveMembers}
+                        onWarning={(msg) => showToast(msg, 'error')}
+                        onUpdateMember={handleUpdateMember}
+                        isUnlocked={isUnlocked}
+                        onUnlockRequest={openUnlockModal}
+                    />
+                );
             case 'report':
                 return <Report members={members} payments={payments} />;
             case 'dailyledger':
                 return <DailyLedger payments={payments} members={members} isUnlocked={isUnlocked} onUnlockRequest={openUnlockModal} />;
             case 'archive':
-                return <Archive members={members} onDeleteMember={handleDeleteMember} />;
+                return <Archive members={members} role={role} onDeleteMember={handleDeleteMember} />;
             case 'expenses':
-                return <MonthlyExpense expenses={expenses} payments={payments} onAddExpense={handleAddExpense} onDeleteExpense={handleDeleteExpense} isUnlocked={isUnlocked} onUnlockRequest={openUnlockModal} />;
+                return <MonthlyExpense expenses={expenses} payments={payments} accessorySales={accessorySales} role={role} onAddExpense={handleAddExpense} onDeleteExpense={handleDeleteExpense} isUnlocked={isUnlocked} onUnlockRequest={openUnlockModal} />;
+            case 'accessories':
+                return (
+                    <Accessories
+                        accessories={accessories}
+                        accessorySales={accessorySales}
+                        members={members}
+                        role={role}
+                        onAddAccessoryItem={addAccessoryItem}
+                        onUpdateAccessoryItem={updateAccessoryItem}
+                        onDeleteAccessoryItem={deleteAccessoryItem}
+                        onSellAccessoryItem={sellAccessoryItem}
+                        onDeleteAccessorySale={handleDeleteAccessorySale}
+                        isUnlocked={isUnlocked}
+                        onUnlockRequest={openUnlockModal}
+                        onNotify={(msg, type) => showToast(msg, type || 'success')}
+                    />
+                );
+            case 'staff':
+                return (
+                    <Staff
+                        staff={staff}
+                        staffPayrolls={staffPayrolls}
+                        staffAttendanceLogs={staffAttendanceLogs}
+                        members={members}
+                        role={role}
+                        onAddStaff={addStaffMember}
+                        onUpdateStaff={updateStaffMember}
+                        onDeleteStaff={deleteStaffMember}
+                        onAssignMember={assignMemberToTrainer}
+                        onUnassignMember={unassignMemberFromTrainer}
+                        onRecordPayroll={recordStaffPayroll}
+                        onDeletePayroll={deleteStaffPayroll}
+                        onRecordAttendance={recordStaffAttendance}
+                        onDeleteAttendanceLog={deleteStaffAttendanceLog}
+                        isUnlocked={isUnlocked}
+                        onUnlockRequest={openUnlockModal}
+                        onNotify={(msg, type) => showToast(msg, type || 'success')}
+                    />
+                );
+            case 'backup':
+                return (
+                    <BackupRestore
+                        members={members}
+                        payments={payments}
+                        expenses={expenses}
+                        accessories={accessories}
+                        accessorySales={accessorySales}
+                        staff={staff}
+                        staffPayrolls={staffPayrolls}
+                        staffAttendanceLogs={staffAttendanceLogs}
+                        gymName={gymName}
+                        role={role}
+                        onRestore={restoreAllData}
+                        onUpdateGymName={handleUpdateGymName}
+                        onNotify={(msg, type) => showToast(msg, type || 'success')}
+                    />
+                );
             case 'dashboard':
             default:
-                return <Dashboard members={members} payments={payments} onNavigate={(v) => setView(v)} onDeletePayment={handleDeletePayment} isUnlocked={isUnlocked} onUnlockRequest={openUnlockModal} />;
+                return <Dashboard members={members} payments={payments} accessorySales={accessorySales} role={role} onNavigate={(v) => setView(v)} onDeletePayment={handleDeletePayment} isUnlocked={isUnlocked} onUnlockRequest={openUnlockModal} />;
         }
     };
 
     const sidebarContent = (
-        <div className="h-full bg-surface flex flex-col p-4">
+        <div className="h-full bg-surface flex flex-col p-4 overflow-y-auto">
             <h1 className="text-2xl font-black text-center mb-6 mt-3 text-[#10b981] tracking-tight">{gymName}</h1>
             <div className="mb-6">
                 <div className="p-3 bg border border-gray-800/80 rounded-xl flex items-center justify-between shadow-inner">
@@ -268,13 +401,20 @@ const App: React.FC = () => {
                         <NavLink icon={<MembersIcon />} label="Members" isActive={view === 'members'} onClick={() => setView('members')} />
                         <NavLink icon={<FeesIcon />} label="Fees & Ledger" isActive={view === 'fees'} onClick={() => setView('fees')} />
                         <NavLink icon={<LedgerIcon />} label="Daily Ledger" isActive={view === 'dailyledger'} onClick={() => setView('dailyledger')} />
+                        <NavLink icon={<AccessoriesIcon />} label="Accessories" isActive={view === 'accessories'} onClick={() => setView('accessories')} />
+                        <NavLink icon={<StaffIcon />} label="Staff & Payroll" isActive={view === 'staff'} onClick={() => setView('staff')} />
                         <NavLink icon={<ExpenseIcon />} label="Monthly Expense" isActive={view === 'expenses'} onClick={() => setView('expenses')} />
                         <NavLink icon={<ArchiveIcon />} label="Archive" isActive={view === 'archive'} onClick={() => setView('archive')} />
                     </>
                 )}
                 <NavLink icon={<AttendanceIcon />} label={role === 'Member' ? 'My Attendance' : 'Attendance'} isActive={view === 'attendance'} onClick={() => setView('attendance')} />
                 {role !== 'Member' && (
-                     <NavLink icon={<DocumentReportIcon />} label="Reports" isActive={view === 'report'} onClick={() => setView('report')} />
+                     <>
+                         <NavLink icon={<DocumentReportIcon />} label="Reports" isActive={view === 'report'} onClick={() => setView('report')} />
+                         {role === 'Admin' && (
+                             <NavLink icon={<BackupIcon />} label="Backup & Restore" isActive={view === 'backup'} onClick={() => setView('backup')} />
+                         )}
+                     </>
                 )}
             </nav>
             <div className="mt-auto pt-4 border-t border-gray-700 space-y-3">
@@ -325,22 +465,37 @@ const App: React.FC = () => {
                     </button>
                 </div>
 
+
                 {/* Gym Name Customizer */}
                 <div className="px-4 py-2 bg-secondary/40 rounded-lg border border-gray-800/50 space-y-1.5">
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-text-secondary">Gym Name</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
+                        {role === 'Admin' ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                        ) : (
+                            <span className="text-[10px] text-amber-400/90 font-semibold px-1.5 py-0.2 bg-amber-500/10 rounded border border-amber-500/20">Admin Only</span>
+                        )}
                     </div>
-                    <input
-                        type="text"
-                        value={gymName}
-                        onChange={(e) => handleUpdateGymName(e.target.value)}
-                        className="w-full bg-secondary py-1 px-2.5 rounded text-xs font-bold text-text-primary border border-gray-700 focus:outline-none focus:border-primary transition-all outline-none"
-                        placeholder="Gym Name Branding"
-                        maxLength={32}
-                    />
+                    {role === 'Admin' ? (
+                        <input
+                            type="text"
+                            value={gymName}
+                            onChange={(e) => handleUpdateGymName(e.target.value)}
+                            className="w-full bg-secondary py-1 px-2.5 rounded text-xs font-bold text-text-primary border border-gray-700 focus:outline-none focus:border-primary transition-all outline-none"
+                            placeholder="Gym Name Branding"
+                            maxLength={32}
+                        />
+                    ) : (
+                        <div 
+                            className="w-full bg-secondary/60 py-1.5 px-2.5 rounded text-xs font-bold text-gray-400 border border-gray-800 flex items-center justify-between cursor-not-allowed select-none"
+                            title="Only Admin can change the Gym Name"
+                        >
+                            <span>{gymName}</span>
+                            <LockIcon className="h-3 w-3 text-gray-500" />
+                        </div>
+                    )}
                 </div>
 
                 <button 
@@ -359,7 +514,7 @@ const App: React.FC = () => {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
-            className="flex h-screen bg-background w-full overflow-hidden"
+            className="flex h-full min-h-full bg-background w-full overflow-hidden"
         >
             <ToastContainer toasts={toasts} removeToast={removeToast} />
 

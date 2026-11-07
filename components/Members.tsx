@@ -1,9 +1,28 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Member, Payment } from '../types';
+import { Member, Payment, Role } from '../types';
 import { CloseIcon, ReportIcon } from './icons';
-import { getLocalDateString, isMemberArchived, parseLocalDate } from '../lib/dateUtils';
+import { getLocalDateString, isMemberArchived, parseLocalDate, isConsistentMember, formatDateDDMMYYYY } from '../lib/dateUtils';
+import { DateInputDDMMYYYY } from './DateInputDDMMYYYY';
+import { getMemberFeeDetails } from '../lib/feeUtils';
+import { ConsistentMemberStar } from './ConsistentMemberStar';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { MaskedAmount } from './MaskedAmount';
+import { 
+    User, 
+    Phone, 
+    Calendar, 
+    CreditCard, 
+    Check, 
+    X, 
+    ShieldCheck, 
+    Sparkles, 
+    Bell, 
+    Layers, 
+    DollarSign,
+    UserPlus,
+    Pencil,
+    UserCheck as UserCheckLucide
+} from 'lucide-react';
 
 const WarningIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -141,6 +160,9 @@ const MemberReportModal: React.FC<{
     };
 
     const handleDeleteMeasurement = (entryId: string) => {
+        if (!window.confirm("Are you sure you want to delete this body measurement entry?")) {
+            return;
+        }
         const currentMeasurements = member.measurements || [];
         const updatedMeasurements = currentMeasurements.filter(m => m.id !== entryId);
 
@@ -171,16 +193,20 @@ const MemberReportModal: React.FC<{
                 </button>
                 
                 {/* Profile Header */}
-                <div className="flex items-center space-x-4 pb-4 border-b border-gray-850">
-                    <img src={member.photo || `https://ui-avatars.com/api/?name=${member.name || '?'}&background=374151&color=F9FAFB`} alt="Profile" className="h-16 w-16 rounded-full object-cover bg-secondary border border-gray-700" />
+                <div className="pb-4 border-b border-gray-850">
                     <div>
-                        <div className="flex items-center gap-2">
-                          <h2 className="text-2xl font-bold text-text-primary">{member.name}</h2>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+                            <span>{member.name}</span>
+                            <ConsistentMemberStar member={member} size="md" />
+                          </h2>
+                          <ConsistentMemberStar member={member} showBadge size="xs" />
+                          <GenderBadge gender={member.gender || 'Male'} size="sm" />
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${member.plan === 'Monthly' ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-pink-500/20 text-pink-400 border border-pink-500/30'}`}>
                             {member.plan} Plan
                           </span>
                         </div>
-                        <p className="text-text-secondary font-mono text-sm">{member.registrationNo}</p>
+                        <p className="text-text-secondary font-mono text-sm mt-1">{member.registrationNo}</p>
                     </div>
                 </div>
 
@@ -221,7 +247,7 @@ const MemberReportModal: React.FC<{
                                             <tr key={p.id} className="border-b border-secondary hover:bg-gray-700/35">
                                                 <td className="p-3 text-text-secondary font-mono text-sm">{p.date}</td>
                                                 <td className="p-3 text-green-400 font-bold text-sm">
-                                                    Rs {p.amount}
+                                                    <MaskedAmount amount={p.amount} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
                                                 </td>
                                                 <td className="p-3 text-text-primary text-sm">{p.method}</td>
                                             </tr>
@@ -292,14 +318,13 @@ const MemberReportModal: React.FC<{
                                 <div className="space-y-3">
                                     <div>
                                         <label htmlFor="meas-date" className="block text-xs font-medium text-text-secondary mb-1">Log Date</label>
-                                        <input 
-                                            id="meas-date"
-                                            type="date" 
-                                            value={mDate} 
-                                            onChange={(e) => setMDate(e.target.value)} 
-                                            className="w-full p-2 bg-secondary border border-gray-800 rounded-lg text-sm text-text-primary focus:outline-none"
-                                            required
-                                        />
+                                        <div className="w-full p-2 bg-secondary border border-gray-800 rounded-lg text-sm text-text-primary">
+                                            <DateInputDDMMYYYY 
+                                                id="meas-date"
+                                                value={mDate} 
+                                                onChange={setMDate} 
+                                            />
+                                        </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
@@ -483,6 +508,7 @@ const MemberReportModal: React.FC<{
 interface MembersProps {
   members: Member[];
   payments: Payment[];
+  role?: Role;
   onAddMember: (member: Omit<Member, 'id'>, paymentMethod: Payment['method']) => void;
   onUpdateMember: (member: Member, paymentMethod: Payment['method']) => void;
   onDeleteMember: (id: string) => void;
@@ -491,24 +517,95 @@ interface MembersProps {
   onUnlockRequest?: () => void;
 }
 
+const getNextRegistrationNo = (membersList: Member[]): string => {
+    if (!membersList || membersList.length === 0) {
+        return '1';
+    }
+
+    let maxNumber = 0;
+    let samplePrefix = '';
+    let samplePadLength = 0;
+
+    membersList.forEach(m => {
+        const reg = (m.registrationNo || '').trim();
+        if (!reg) return;
+
+        const match = reg.match(/^(.*?)[^\d]*(\d+)$/);
+        if (match) {
+            const prefix = match[1] || '';
+            const numStr = match[2];
+            const num = parseInt(numStr, 10);
+            if (!isNaN(num) && num > maxNumber) {
+                maxNumber = num;
+                samplePrefix = prefix;
+                samplePadLength = numStr.length;
+            }
+        } else {
+            const num = parseInt(reg, 10);
+            if (!isNaN(num) && num > maxNumber) {
+                maxNumber = num;
+                samplePrefix = '';
+                samplePadLength = reg.length;
+            }
+        }
+    });
+
+    if (maxNumber === 0) {
+        return (membersList.length + 1).toString();
+    }
+
+    const nextNum = maxNumber + 1;
+    if (samplePadLength > 1 && nextNum.toString().length <= samplePadLength) {
+        return `${samplePrefix}${nextNum.toString().padStart(samplePadLength, '0')}`;
+    }
+
+    return `${samplePrefix}${nextNum}`;
+};
+
 const MemberModal: React.FC<{
     member: Partial<Member> | null;
+    existingMembers?: Member[];
     onClose: () => void;
     onSave: (member: Partial<Member>, paymentMethod: Payment['method']) => void;
-}> = ({ member, onClose, onSave }) => {
+}> = ({ member, existingMembers = [], onClose, onSave }) => {
     const [formData, setFormData] = useState<Partial<Member> & { paymentMethod?: Payment['method'] }>({});
+    const [paymentStatusMode, setPaymentStatusMode] = useState<'paid' | 'partial' | 'unpaid'>('unpaid');
+    const [paidAmountInput, setPaidAmountInput] = useState<string>('');
+
+    const nextInLineRegNo = useMemo(() => getNextRegistrationNo(existingMembers), [existingMembers]);
+
+    const duplicateMember = useMemo(() => {
+        const currentReg = (formData.registrationNo || '').trim().toLowerCase();
+        if (!currentReg) return null;
+        return existingMembers.find(m => 
+            m.id !== member?.id && 
+            (m.registrationNo || '').trim().toLowerCase() === currentReg
+        );
+    }, [formData.registrationNo, existingMembers, member?.id]);
 
     useEffect(() => {
+        const autoRegNo = getNextRegistrationNo(existingMembers);
         const initialData: Partial<Member> & { paymentMethod?: Payment['method'] } = (member && member.id)
-            ? { ...member, remindersEnabled: member.remindersEnabled ?? true, category: member.category || 'Strength' }
+            ? { 
+                ...member, 
+                registrationNo: member.registrationNo || autoRegNo,
+                gender: member.gender || 'Male', 
+                remindersEnabled: member.remindersEnabled ?? true, 
+                category: member.category || 'Strength',
+                paidAmount: member.feePaid ? member.fee : (member.paidAmount ?? 0),
+                pendingDue: member.feePaid ? 0 : (member.pendingDue ?? Math.max(0, (member.fee || 0) - (member.paidAmount ?? 0))),
+              }
             : {
                 name: '',
-                registrationNo: '',
-                age: 0,
+                gender: 'Male',
+                registrationNo: autoRegNo,
+                age: 20,
                 phone: '',
                 plan: 'Monthly',
                 fee: 2000,
                 feePaid: false,
+                paidAmount: 0,
+                pendingDue: 2000,
                 joinDate: getLocalDateString(),
                 photo: '',
                 expiryDate: '',
@@ -517,7 +614,17 @@ const MemberModal: React.FC<{
                 category: 'Strength',
               };
         setFormData(initialData);
-    }, [member]);
+
+        const initialMode: 'paid' | 'partial' | 'unpaid' = (member && member.id)
+            ? (member.feePaid ? 'paid' : (member.paidAmount && member.paidAmount > 0 ? 'partial' : 'unpaid'))
+            : 'unpaid';
+        setPaymentStatusMode(initialMode);
+        setPaidAmountInput(
+            initialMode === 'paid'
+                ? String(member?.fee || 2000)
+                : (member?.paidAmount && member.paidAmount > 0 ? String(member.paidAmount) : '')
+        );
+    }, [member, existingMembers]);
 
     useEffect(() => {
         if (formData.joinDate && formData.plan) {
@@ -532,7 +639,6 @@ const MemberModal: React.FC<{
             }
         }
     }, [formData.joinDate, formData.plan, formData.expiryDate]);
-
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
@@ -557,142 +663,529 @@ const MemberModal: React.FC<{
                 } else if (processedValue === 'Personal Training') {
                     nextData.fee = 15000;
                 }
+                
+                if (paymentStatusMode === 'paid') {
+                    setPaidAmountInput(String(nextData.fee));
+                    nextData.paidAmount = nextData.fee;
+                    nextData.pendingDue = 0;
+                } else if (paymentStatusMode === 'partial') {
+                    const currentPaid = Math.max(0, parseFloat(paidAmountInput) || 0);
+                    nextData.paidAmount = currentPaid;
+                    nextData.pendingDue = Math.max(0, (nextData.fee || 0) - currentPaid);
+                } else {
+                    nextData.paidAmount = 0;
+                    nextData.pendingDue = nextData.fee || 0;
+                }
+            } else if (name === 'fee') {
+                const newFee = Math.max(0, parseFloat(value) || 0);
+                if (paymentStatusMode === 'paid') {
+                    setPaidAmountInput(String(newFee));
+                    nextData.paidAmount = newFee;
+                    nextData.pendingDue = 0;
+                } else if (paymentStatusMode === 'partial') {
+                    const currentPaid = Math.max(0, parseFloat(paidAmountInput) || 0);
+                    nextData.paidAmount = currentPaid;
+                    nextData.pendingDue = Math.max(0, newFee - currentPaid);
+                } else {
+                    nextData.paidAmount = 0;
+                    nextData.pendingDue = newFee;
+                }
             }
             return nextData;
         });
     };
 
-    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = (loadEvent) => {
-                setFormData(prev => ({ ...prev, photo: loadEvent.target?.result as string }));
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(formData, formData.paymentMethod || 'Cash');
+        const fee = Number(formData.fee) || 0;
+        let finalPaid = 0;
+        let isFull = false;
+
+        if (paymentStatusMode === 'paid') {
+            finalPaid = fee;
+            isFull = fee > 0;
+        } else if (paymentStatusMode === 'partial') {
+            finalPaid = Math.min(fee, Math.max(0, parseFloat(paidAmountInput) || 0));
+            isFull = finalPaid >= fee && fee > 0;
+        } else {
+            finalPaid = 0;
+            isFull = false;
+        }
+
+        const finalData = {
+            ...formData,
+            fee,
+            feePaid: isFull,
+            paidAmount: finalPaid,
+            pendingDue: Math.max(0, fee - finalPaid),
+        };
+        onSave(finalData as Member, formData.paymentMethod || 'Cash');
     };
     
     if (!member) return null;
 
+    const currentFee = Number(formData.fee) || 0;
+    const currentPaid = paymentStatusMode === 'paid'
+        ? currentFee
+        : paymentStatusMode === 'unpaid'
+            ? 0
+            : Math.min(currentFee, Math.max(0, parseFloat(paidAmountInput) || 0));
+    const currentDue = Math.max(0, currentFee - currentPaid);
+
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-surface rounded-lg shadow-xl p-8 w-full max-w-lg relative max-h-full overflow-y-auto">
-                <button onClick={onClose} className="absolute top-4 right-4 text-text-secondary hover:text-text-primary">
-                    <CloseIcon />
-                </button>
-                <h2 className="text-2xl font-bold mb-6 text-text-primary">{member.id ? 'Edit Member' : 'Add New Member'}</h2>
-                <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-x-4 gap-y-4">
-                    <div className="col-span-2">
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Full Name</label>
-                        <input type="text" name="name" value={formData.name || ''} onChange={handleChange} placeholder="Full Name" className="w-full p-3 bg-secondary rounded-lg" required />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Registration No.</label>
-                        <input type="text" name="registrationNo" value={formData.registrationNo || ''} onChange={handleChange} placeholder="e.g., SF-001" className="w-full p-3 bg-secondary rounded-lg" required />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Age</label>
-                        <input type="number" name="age" value={formData.age || ''} onChange={handleChange} placeholder="Age" className="w-full p-3 bg-secondary rounded-lg" required />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Phone</label>
-                        <input type="tel" name="phone" value={formData.phone || ''} onChange={handleChange} placeholder="Phone Number" className="w-full p-3 bg-secondary rounded-lg" required />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Plan</label>
-                        <select name="plan" value={formData.plan || 'Monthly'} onChange={handleChange} className="w-full p-3 bg-secondary rounded-lg">
-                            <option value="Monthly">Monthly</option>
-                            <option value="Quarterly">Quarterly</option>
-                            <option value="Yearly">Yearly</option>
-                        </select>
-                    </div>
-                     <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Fee</label>
-                        <input type="number" name="fee" value={formData.fee || ''} onChange={handleChange} placeholder="Fee Amount" className="w-full p-3 bg-secondary rounded-lg" required />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Fee Status</label>
-                        <select name="feePaid" value={formData.feePaid ? 'true' : 'false'} onChange={handleChange} className="w-full p-3 bg-secondary rounded-lg">
-                            <option value="true">Paid</option>
-                            <option value="false">Unpaid</option>
-                        </select>
-                    </div>
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-[#121620] border border-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl my-auto text-text-primary overflow-hidden flex flex-col max-h-[92vh]">
+                {/* Decorative Top Accent Line */}
+                <div className="h-1 bg-gradient-to-r from-primary via-emerald-400 to-indigo-500 w-full" />
 
-                    {formData.feePaid && (
-                         <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Payment Method</label>
-                            <select name="paymentMethod" value={formData.paymentMethod || 'Cash'} onChange={handleChange} className="w-full p-3 bg-secondary rounded-lg">
-                                <option value="Cash">Cash</option>
-                                <option value="Easypaisa">Easypaisa</option>
-                                <option value="Jazz Cash">Jazz Cash</option>
-                                <option value="Bank Transfer">Bank Transfer</option>
-                            </select>
+                {/* Modal Header */}
+                <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between bg-surface/50">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shadow-sm">
+                            {member.id ? <Pencil className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
                         </div>
-                    )}
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-lg font-bold text-white tracking-tight">
+                                    {member.id ? 'Edit Member Profile' : 'Register New Member'}
+                                </h2>
+                                <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-primary/20 text-primary border border-primary/30">
+                                    {formData.registrationNo || 'REG'}
+                                </span>
+                            </div>
+                            <p className="text-xs text-text-secondary mt-0.5">
+                                Complete the member's profile, training package, and payment details
+                            </p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={onClose}
+                        className="h-8 w-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition-colors cursor-pointer"
+                        title="Close modal"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Category</label>
-                        <select name="category" value={formData.category || 'Strength'} onChange={handleChange} className="w-full p-3 bg-secondary rounded-lg">
-                            <option value="Strength">Strength</option>
-                            <option value="Cardio">Cardio</option>
-                            <option value="Personal Training">Personal Training</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Join Date</label>
-                        <input type="date" name="joinDate" value={formData.joinDate || ''} onChange={handleChange} className="w-full p-3 bg-secondary rounded-lg" required />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Expiry Date</label>
-                        <input type="date" name="expiryDate" value={formData.expiryDate || ''} className="w-full p-3 bg-gray-700 rounded-lg cursor-not-allowed text-gray-400" readOnly />
-                    </div>
+                {/* Modal Scrollable Body */}
+                <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-5 flex-1">
+                    {/* SECTION 1: Personal Information */}
+                    <div className="bg-surface/60 rounded-xl p-4 border border-gray-800/80 space-y-4">
+                        <div className="flex items-center justify-between border-b border-gray-800/70 pb-2.5">
+                            <span className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+                                <User className="h-3.5 w-3.5 text-primary" />
+                                Personal Information & Reg #
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30 font-bold">
+                                    Next In-Line: #{nextInLineRegNo}
+                                </span>
+                            </div>
+                        </div>
 
-                    <div className="col-span-2 mt-2">
-                        <label className="block text-sm font-medium text-text-secondary mb-2">Profile Photo</label>
-                        <div className="flex items-center space-x-4">
-                            <img src={formData.photo || `https://ui-avatars.com/api/?name=${formData.name || '?'}&background=374151&color=F9FAFB`} alt="Profile" className="h-20 w-20 rounded-full object-cover bg-secondary" />
+                        {/* Registration Number & Full Name */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* Registration Number (Fully Editable) */}
                             <div>
-                                <label htmlFor="photo-upload" className="cursor-pointer bg-secondary px-4 py-2 rounded-lg text-sm font-medium text-text-primary hover:bg-gray-600 transition-colors">
-                                    Upload Image
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-xs font-semibold text-text-secondary">
+                                        Registration No (Reg #) <span className="text-red-400">*</span>
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData(prev => ({ ...prev, registrationNo: nextInLineRegNo }))}
+                                        className="text-[10px] text-emerald-400 hover:text-emerald-300 font-mono font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                        title="Auto-fill with next available sequential number"
+                                    >
+                                        <span>Use Next #{nextInLineRegNo}</span>
+                                    </button>
+                                </div>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-mono text-xs font-bold">
+                                        #
+                                    </span>
+                                    <input 
+                                        type="text" 
+                                        name="registrationNo" 
+                                        value={formData.registrationNo || ''} 
+                                        onChange={handleChange} 
+                                        placeholder={nextInLineRegNo} 
+                                        className="w-full pl-8 pr-3 py-2.5 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary placeholder-gray-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-mono font-bold" 
+                                        required 
+                                    />
+                                </div>
+                                {duplicateMember && (
+                                    <p className="text-[11px] text-amber-400 mt-1 flex items-center gap-1 font-medium bg-amber-500/10 p-1.5 rounded border border-amber-500/20">
+                                        <span>⚠️</span>
+                                        <span>Reg #{formData.registrationNo} is currently assigned to <strong>{duplicateMember.name}</strong>.</span>
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Full Name */}
+                            <div>
+                                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                                    Full Name <span className="text-red-400">*</span>
                                 </label>
-                                <input
-                                    id="photo-upload"
-                                    name="photo"
-                                    type="file"
-                                    accept="image/png, image/jpeg"
-                                    onChange={handlePhotoChange}
-                                    className="hidden"
+                                <div className="relative">
+                                    <input 
+                                        type="text" 
+                                        name="name" 
+                                        value={formData.name || ''} 
+                                        onChange={handleChange} 
+                                        placeholder="e.g. Muhammad Ali" 
+                                        className="w-full px-3.5 py-2.5 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary placeholder-gray-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium" 
+                                        required 
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Gender & Age */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            {/* Gender */}
+                            <div>
+                                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                                    Gender
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData(prev => ({ ...prev, gender: 'Male' }))}
+                                        className={`py-2 px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 text-xs border transition-all cursor-pointer ${
+                                            (formData.gender || 'Male') === 'Male'
+                                                ? 'bg-blue-600/25 text-blue-400 border-blue-500/60 shadow-sm ring-1 ring-blue-500/40'
+                                                : 'bg-secondary text-text-secondary border-gray-700 hover:text-white'
+                                        }`}
+                                    >
+                                        <span className="text-sm font-black">♂</span>
+                                        <span>Male</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData(prev => ({ ...prev, gender: 'Female' }))}
+                                        className={`py-2 px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 text-xs border transition-all cursor-pointer ${
+                                            formData.gender === 'Female'
+                                                ? 'bg-pink-600/25 text-pink-400 border-pink-500/60 shadow-sm ring-1 ring-pink-500/40'
+                                                : 'bg-secondary text-text-secondary border-gray-700 hover:text-white'
+                                        }`}
+                                    >
+                                        <span className="text-sm font-black">♀</span>
+                                        <span>Female</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Age */}
+                            <div>
+                                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                                    Age (Years)
+                                </label>
+                                <input 
+                                    type="number" 
+                                    name="age" 
+                                    min={10}
+                                    max={99}
+                                    value={formData.age || ''} 
+                                    onChange={handleChange} 
+                                    placeholder="e.g. 24" 
+                                    className="w-full px-3.5 py-2.5 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary focus:outline-none focus:border-primary transition-all font-mono" 
+                                />
+                            </div>
+                        </div>
+
+                        {/* Phone Number */}
+                        <div className="pt-1">
+                            <label className="block text-xs font-semibold text-text-secondary mb-1">
+                                Phone Number <span className="text-red-400">*</span>
+                            </label>
+                            <div className="relative">
+                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <input 
+                                    type="tel" 
+                                    name="phone" 
+                                    value={formData.phone || ''} 
+                                    onChange={handleChange} 
+                                    placeholder="0300-1234567" 
+                                    className="w-full pl-9 pr-3 py-2.5 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary placeholder-gray-500 focus:outline-none focus:border-primary transition-all font-mono" 
+                                    required 
                                 />
                             </div>
                         </div>
                     </div>
-                    
-                    <div className="col-span-2 mt-2">
-                        <div className="flex items-center space-x-3">
-                            <input 
-                                type="checkbox" 
-                                id="remindersEnabled" 
-                                name="remindersEnabled"
-                                checked={formData.remindersEnabled ?? true} 
-                                onChange={handleChange}
-                                className="h-4 w-4 rounded border-gray-500 bg-secondary text-primary focus:ring-primary"
-                            />
-                            <label htmlFor="remindersEnabled" className="text-sm font-medium text-text-secondary">
-                                Enable Fee/Expiry Reminders
-                            </label>
+
+                    {/* SECTION 2: Membership Package & Dates */}
+                    <div className="bg-surface/60 rounded-xl p-4 border border-gray-800/80 space-y-4">
+                        <div className="flex items-center justify-between border-b border-gray-800/70 pb-2.5">
+                            <span className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+                                <Layers className="h-3.5 w-3.5 text-primary" />
+                                Membership Package & Dates
+                            </span>
+                            <span className="text-[11px] text-emerald-400 font-semibold">
+                                {formData.category} Package
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                                    Workout Category
+                                </label>
+                                <select 
+                                    name="category" 
+                                    value={formData.category || 'Strength'} 
+                                    onChange={handleChange} 
+                                    className="w-full p-2.5 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary focus:outline-none focus:border-primary transition-all cursor-pointer font-medium"
+                                >
+                                    <option value="Strength">Strength (Rs 2,000/mo)</option>
+                                    <option value="Cardio">Cardio (Rs 4,000/mo)</option>
+                                    <option value="Personal Training">Personal Training (Rs 15,000/mo)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                                    Duration / Plan
+                                </label>
+                                <select 
+                                    name="plan" 
+                                    value={formData.plan || 'Monthly'} 
+                                    onChange={handleChange} 
+                                    className="w-full p-2.5 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary focus:outline-none focus:border-primary transition-all cursor-pointer font-medium"
+                                >
+                                    <option value="Monthly">Monthly (1 Month)</option>
+                                    <option value="Quarterly">Quarterly (3 Months)</option>
+                                    <option value="Yearly">Yearly (12 Months)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            <div>
+                                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                                    Join Date
+                                </label>
+                                <div className="w-full px-3 py-2 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary focus-within:border-primary transition-all cursor-pointer font-mono flex items-center justify-between">
+                                    <DateInputDDMMYYYY
+                                        value={formData.joinDate || ''}
+                                        onChange={(val) => setFormData(prev => ({ ...prev, joinDate: val }))}
+                                        id="member-join-date"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                                    Expiry Date (Calculated)
+                                </label>
+                                <div className="w-full px-3 py-2.5 bg-secondary/50 border border-gray-800 rounded-xl text-sm text-gray-400 font-mono">
+                                    <span>{formData.expiryDate ? formatDateDDMMYYYY(formData.expiryDate) : 'DD-MM-YYYY'}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="col-span-2 flex justify-end space-x-4 pt-4 mt-4 border-t border-gray-700">
-                        <button type="button" onClick={onClose} className="py-2 px-4 bg-gray-600 rounded-lg hover:bg-gray-700">Cancel</button>
-                        <button type="submit" className="py-2 px-4 bg-primary rounded-lg hover:bg-primary-hover">Save Member</button>
+                    {/* SECTION 3: Fee & Payment Settlement */}
+                    <div className="bg-surface/60 rounded-xl p-4 border border-gray-800/80 space-y-4">
+                        <div className="flex items-center justify-between border-b border-gray-800/70 pb-2.5">
+                            <span className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+                                <DollarSign className="h-3.5 w-3.5 text-primary" />
+                                Fee & Payment Settlement
+                            </span>
+                            <span className={`text-[11px] font-mono font-bold ${currentDue === 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                {currentDue === 0 ? '✓ Fully Cleared' : `Balance Due: Rs ${currentDue.toLocaleString()}`}
+                            </span>
+                        </div>
+
+                        {/* Fee Amount & Payment Status Mode */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                                    Membership Fee (PKR) <span className="text-red-400">*</span>
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-mono text-xs">
+                                        Rs
+                                    </span>
+                                    <input 
+                                        type="number" 
+                                        name="fee" 
+                                        min={0}
+                                        value={formData.fee || ''} 
+                                        onChange={handleChange} 
+                                        placeholder="2000" 
+                                        className="w-full pl-9 pr-3 py-2.5 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary focus:outline-none focus:border-primary transition-all font-mono font-bold" 
+                                        required 
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                                    Payment Status
+                                </label>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPaymentStatusMode('paid');
+                                            const fee = Number(formData.fee) || 0;
+                                            setPaidAmountInput(String(fee));
+                                            setFormData(prev => ({ ...prev, feePaid: true, paidAmount: fee, pendingDue: 0 }));
+                                        }}
+                                        className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                            paymentStatusMode === 'paid'
+                                                ? 'bg-emerald-600/30 text-emerald-400 border-emerald-500 shadow-sm ring-1 ring-emerald-500/40'
+                                                : 'bg-secondary text-text-secondary border-gray-700 hover:text-white'
+                                        }`}
+                                    >
+                                        Paid
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPaymentStatusMode('partial');
+                                            setPaidAmountInput('');
+                                            setFormData(prev => ({ ...prev, feePaid: false, paidAmount: 0, pendingDue: Number(prev.fee) || 0 }));
+                                        }}
+                                        className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                            paymentStatusMode === 'partial'
+                                                ? 'bg-amber-600/30 text-amber-400 border-amber-500 shadow-sm ring-1 ring-amber-500/40'
+                                                : 'bg-secondary text-text-secondary border-gray-700 hover:text-white'
+                                        }`}
+                                    >
+                                        Partial
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPaymentStatusMode('unpaid');
+                                            setPaidAmountInput('');
+                                            const fee = Number(formData.fee) || 0;
+                                            setFormData(prev => ({ ...prev, feePaid: false, paidAmount: 0, pendingDue: fee }));
+                                        }}
+                                        className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                            paymentStatusMode === 'unpaid'
+                                                ? 'bg-red-600/30 text-red-400 border-red-500 shadow-sm ring-1 ring-red-500/40'
+                                                : 'bg-secondary text-text-secondary border-gray-700 hover:text-white'
+                                        }`}
+                                    >
+                                        Unpaid
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Partial Payment Input & Live Calculation */}
+                        {paymentStatusMode === 'partial' && (
+                            <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2">
+                                <label className="block text-xs font-bold text-amber-300 uppercase tracking-wider">
+                                    Amount Received So Far (PKR)
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-mono text-xs">
+                                        Rs
+                                    </span>
+                                    <input 
+                                        type="number" 
+                                        name="paidAmount" 
+                                        min={0}
+                                        max={formData.fee || 0}
+                                        value={paidAmountInput} 
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setPaidAmountInput(val);
+                                            const p = Math.max(0, parseFloat(val) || 0);
+                                            const f = Number(formData.fee) || 0;
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                paidAmount: p,
+                                                pendingDue: Math.max(0, f - p),
+                                                feePaid: p >= f && f > 0
+                                            }));
+                                        }} 
+                                        placeholder="Enter amount (e.g. 600, 700)" 
+                                        className="w-full pl-9 pr-3 py-2 bg-secondary border border-gray-700 text-white rounded-lg font-mono font-bold text-sm focus:outline-none focus:border-amber-500" 
+                                    />
+                                </div>
+                                <div className="flex justify-between items-center text-xs pt-1">
+                                    <span className="text-text-secondary">Fee: Rs {(formData.fee || 0).toLocaleString()}</span>
+                                    <span className="text-amber-400 font-bold font-mono">
+                                        Remaining Due: Rs {currentDue.toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Payment Method Selector */}
+                        {Boolean(paymentStatusMode === 'paid' || paymentStatusMode === 'partial') && (
+                            <div className="pt-1">
+                                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                                    Payment Method
+                                </label>
+                                <div className="relative">
+                                    <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                    <select 
+                                        name="paymentMethod" 
+                                        value={formData.paymentMethod || 'Cash'} 
+                                        onChange={handleChange} 
+                                        className="w-full pl-9 pr-3 py-2.5 bg-secondary border border-gray-700 rounded-xl text-sm text-text-primary focus:outline-none focus:border-primary transition-all cursor-pointer font-medium"
+                                    >
+                                        <option value="Cash">Cash</option>
+                                        <option value="Easypaisa">Easypaisa</option>
+                                        <option value="Jazz Cash">Jazz Cash</option>
+                                        <option value="Bank Transfer">Bank Transfer</option>
+                                    </select>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* SECTION 4: Notifications & Preferences */}
+                    <div className="bg-surface/60 rounded-xl p-3.5 border border-gray-800/80 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center text-gray-400">
+                                <Bell className="h-4 w-4" />
+                            </div>
+                            <div>
+                                <label htmlFor="remindersEnabled" className="text-xs font-bold text-text-primary block cursor-pointer">
+                                    Automated Fee & Renewal Alerts
+                                </label>
+                                <span className="text-[11px] text-text-secondary">
+                                    Send WhatsApp / SMS alerts for upcoming fee dues and expiry
+                                </span>
+                            </div>
+                        </div>
+                        <input 
+                            type="checkbox" 
+                            id="remindersEnabled" 
+                            name="remindersEnabled"
+                            checked={formData.remindersEnabled ?? true} 
+                            onChange={handleChange}
+                            className="h-4 w-4 rounded border-gray-600 bg-secondary text-primary focus:ring-primary cursor-pointer"
+                        />
+                    </div>
+
+                    {/* Footer Actions */}
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-800">
+                        <div className="text-xs text-text-secondary font-mono hidden sm:block">
+                            Plan: <span className="text-white font-bold">{formData.plan}</span> ({formData.category})
+                        </div>
+                        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                            <button 
+                                type="button" 
+                                onClick={onClose} 
+                                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 border border-gray-700 transition-colors cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                type="submit" 
+                                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white shadow-lg shadow-primary/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                            >
+                                <Check className="h-4 w-4" />
+                                <span>{member.id ? 'Save Changes' : 'Register Member'}</span>
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -714,6 +1207,22 @@ const isExpiringSoon = (expiryDate: string, days: number = 7): boolean => {
     return expiry <= threshold && expiry >= today;
 };
 
+export const GenderBadge: React.FC<{ gender?: 'Male' | 'Female' | 'Other'; size?: 'sm' | 'md' }> = ({ gender = 'Male', size = 'md' }) => {
+  const isFemale = gender === 'Female';
+  return (
+    <span className={`inline-flex items-center gap-1 font-semibold rounded-full ${
+      size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-0.5 text-xs'
+    } ${
+      isFemale 
+        ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30' 
+        : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+    }`}>
+      <span>{isFemale ? '♀' : '♂'}</span>
+      <span>{gender}</span>
+    </span>
+  );
+};
+
 const CATEGORY_COLORS: { [key: string]: string } = {
   'Strength': 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
   'Cardio': 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
@@ -721,15 +1230,39 @@ const CATEGORY_COLORS: { [key: string]: string } = {
 };
 
 
-const Members: React.FC<MembersProps> = ({ members, payments, onAddMember, onUpdateMember, onDeleteMember, onWarning, isUnlocked = false, onUnlockRequest }) => {
+const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', onAddMember, onUpdateMember, onDeleteMember, onWarning, isUnlocked = false, onUnlockRequest }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedMember, setSelectedMember] = useState<Partial<Member> | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [genderFilter, setGenderFilter] = useState<'All' | 'Male' | 'Female'>('All');
+    const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Expired' | 'Archived'>('All');
+    const [showOnlyConsistent, setShowOnlyConsistent] = useState(false);
     const [lastWarnedMemberId, setLastWarnedMemberId] = useState<string | null>(null);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [memberForReport, setMemberForReport] = useState<Member | null>(null);
+
+    const todayStr = getLocalDateString();
+    const totalCount = members.length;
+    const maleCount = useMemo(() => members.filter(m => (m.gender || 'Male') === 'Male').length, [members]);
+    const femaleCount = useMemo(() => members.filter(m => m.gender === 'Female').length, [members]);
+    const activeCount = useMemo(() => members.filter(m => new Date(m.expiryDate) >= new Date(todayStr) && !isMemberArchived(m)).length, [members, todayStr]);
+    const expiredCount = useMemo(() => members.filter(m => new Date(m.expiryDate) < new Date(todayStr) && !isMemberArchived(m)).length, [members, todayStr]);
+    const archivedCount = useMemo(() => members.filter(m => isMemberArchived(m)).length, [members]);
+    const consistentCount = useMemo(() => members.filter(m => isConsistentMember(m, todayStr)).length, [members, todayStr]);
+
+    const maxRegisteredNum = useMemo(() => {
+        let max = 0;
+        members.forEach(m => {
+            const digits = (m.registrationNo || '').replace(/\D/g, '');
+            if (digits) {
+                const n = parseInt(digits, 10);
+                if (!isNaN(n) && n > max) max = n;
+            }
+        });
+        return max;
+    }, [members]);
 
     const handleAddNew = () => {
         setSelectedMember({});
@@ -747,6 +1280,10 @@ const Members: React.FC<MembersProps> = ({ members, payments, onAddMember, onUpd
     };
     
     const handleDeleteRequest = (member: Member) => {
+        if (role === 'Manager') {
+            onWarning?.('Super Admin authority required to permanently delete member records.');
+            return;
+        }
         setMemberToDelete(member);
         setIsConfirmModalOpen(true);
     };
@@ -765,7 +1302,6 @@ const Members: React.FC<MembersProps> = ({ members, payments, onAddMember, onUpd
         } else {
             const newMember = {
                 ...memberData,
-                photo: memberData.photo || `https://picsum.photos/seed/${Math.random()}/200`,
                 attendance: {},
             } as Omit<Member, 'id'>;
 
@@ -775,12 +1311,80 @@ const Members: React.FC<MembersProps> = ({ members, payments, onAddMember, onUpd
         setSelectedMember(null);
     };
 
-    const filteredMembers = members
-        .filter(m => !isMemberArchived(m))
-        .filter(m =>
-            m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            m.registrationNo.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+    const filteredMembers = useMemo(() => {
+        const rawTrimmed = searchTerm.trim();
+        const meetsConsistency = (m: Member) => {
+            if (!showOnlyConsistent) return true;
+            return isConsistentMember(m, todayStr);
+        };
+
+        const meetsGender = (m: Member) => {
+            const memberGender = m.gender || 'Male';
+            return genderFilter === 'All' || memberGender === genderFilter;
+        };
+
+        const meetsStatus = (m: Member) => {
+            if (statusFilter === 'All') return true;
+            const isArch = isMemberArchived(m);
+            const isExp = new Date(m.expiryDate) < new Date(todayStr);
+            if (statusFilter === 'Active') return !isArch && !isExp;
+            if (statusFilter === 'Expired') return !isArch && isExp;
+            if (statusFilter === 'Archived') return isArch;
+            return true;
+        };
+
+        // When NO search term is active, filter by status, gender, and consistency across all members
+        if (!rawTrimmed) {
+            return members.filter(m => meetsStatus(m) && meetsGender(m) && meetsConsistency(m));
+        }
+
+        // When searching, search across ALL members (active, expired, and archived like Reg 1-30)
+        const query = rawTrimmed.toLowerCase();
+        const isPureNumeric = /^#?\d+$/.test(query);
+        const queryDigits = query.replace(/\D/g, '');
+        const queryNum = queryDigits !== '' ? parseInt(queryDigits, 10) : NaN;
+
+        const matchesExactReg = (m: Member) => {
+            const reg = (m.registrationNo || '').trim().toLowerCase();
+            if (!reg) return false;
+            const regClean = reg.replace(/^#/, '');
+            const queryClean = query.replace(/^#/, '');
+            if (reg === query || regClean === queryClean) return true;
+
+            const regDigits = reg.replace(/\D/g, '');
+            if (!isNaN(queryNum) && regDigits !== '') {
+                const rNum = parseInt(regDigits, 10);
+                if (!isNaN(rNum) && rNum === queryNum) return true;
+            }
+            return false;
+        };
+
+        if (isPureNumeric) {
+            const exactMatches = members.filter(m => matchesExactReg(m));
+            if (exactMatches.length > 0) {
+                return exactMatches.filter(m => meetsGender(m) && meetsConsistency(m));
+            }
+
+            if (queryDigits.length >= 10) {
+                const phoneMatches = members.filter(m => {
+                    const cleanPhone = (m.phone || '').replace(/\D/g, '');
+                    return cleanPhone === queryDigits;
+                });
+                return phoneMatches.filter(m => meetsGender(m) && meetsConsistency(m));
+            }
+
+            return [];
+        }
+
+        return members.filter(m => {
+            if (!meetsGender(m) || !meetsConsistency(m)) return false;
+            return (
+                m.name.toLowerCase().includes(query) || 
+                m.registrationNo.toLowerCase().includes(query) ||
+                (m.phone && m.phone.includes(query))
+            );
+        });
+    }, [members, statusFilter, genderFilter, searchTerm, showOnlyConsistent, todayStr]);
 
     // Check for expired members in search results to show warning
     useEffect(() => {
@@ -818,8 +1422,8 @@ const Members: React.FC<MembersProps> = ({ members, payments, onAddMember, onUpd
     }, [searchTerm, filteredMembers, onWarning, lastWarnedMemberId]);
 
     return (
-        <div className="p-4 md:p-8">
-            {isModalOpen && <MemberModal member={selectedMember} onClose={() => setIsModalOpen(false)} onSave={handleSave} />}
+        <div className="p-4 md:p-8 space-y-6">
+            {isModalOpen && <MemberModal member={selectedMember} existingMembers={members} onClose={() => setIsModalOpen(false)} onSave={handleSave} />}
             {isConfirmModalOpen && <ConfirmDeleteModal member={memberToDelete} onClose={() => setIsConfirmModalOpen(false)} onConfirm={handleConfirmDelete} />}
             {isReportModalOpen && (
                 <MemberReportModal 
@@ -832,42 +1436,297 @@ const Members: React.FC<MembersProps> = ({ members, payments, onAddMember, onUpd
                 />
             )}
             
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold">Members</h1>
-                <div className="flex items-center space-x-4">
+            {/* Header & Main Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-text-primary">Members Directory</h1>
+                    <p className="text-sm text-text-secondary mt-1">Manage gym memberships, profiles, categories and gender registration</p>
+                </div>
+                <button 
+                    onClick={handleAddNew} 
+                    className="bg-primary text-white font-bold py-2.5 px-5 rounded-xl hover:bg-primary-hover shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer shrink-0"
+                >
+                    <span>+ Add New Member</span>
+                </button>
+            </div>
+
+            {/* Data Retention Guarantee & Integrity Alert */}
+            <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-xl px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
+                <div className="flex items-center gap-2.5">
+                    <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+                        <ShieldCheck className="w-4 h-4" />
+                    </span>
+                    <div>
+                        <span className="text-xs font-bold text-emerald-300 block">
+                            Permanent Records Guarantee & Preservation
+                        </span>
+                        <span className="text-[11px] text-text-secondary">
+                            All member registrations from Reg #1 up to Reg #{maxRegisteredNum || totalCount} and their historical payments are permanently stored and never automatically deleted.
+                        </span>
+                    </div>
+                </div>
+                <div className="text-[11px] font-mono text-emerald-400/90 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20 whitespace-nowrap self-start sm:self-auto">
+                    {totalCount} Total Registered Profiles
+                </div>
+            </div>
+
+            {/* Quick Status Demographics Cards (Clickable Filters) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {/* Total */}
+                <div 
+                    onClick={() => setStatusFilter('All')}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                        statusFilter === 'All'
+                            ? 'bg-teal-500/15 border-teal-500/50 shadow-md ring-2 ring-teal-500/30'
+                            : 'bg-surface border-gray-800 hover:border-gray-700'
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">All Members</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-text-secondary font-medium">100%</span>
+                    </div>
+                    <div className="text-2xl font-black text-text-primary mt-1 font-mono">{totalCount}</div>
+                    <div className="text-[11px] text-text-secondary mt-1 font-mono">Reg #1 - #{maxRegisteredNum || totalCount}</div>
+                </div>
+
+                {/* Active Members */}
+                <div 
+                    onClick={() => setStatusFilter('Active')}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                        statusFilter === 'Active'
+                            ? 'bg-emerald-500/20 border-emerald-500 shadow-md ring-2 ring-emerald-500/40'
+                            : 'bg-surface border-gray-800 hover:border-emerald-500/30'
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                            <span>✓</span> Active
+                        </span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium">
+                            {totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0}%
+                        </span>
+                    </div>
+                    <div className="text-2xl font-black text-emerald-400 mt-1 font-mono">{activeCount}</div>
+                    <div className="text-[11px] text-text-secondary mt-1">Valid membership</div>
+                </div>
+
+                {/* Expired Members */}
+                <div 
+                    onClick={() => setStatusFilter('Expired')}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                        statusFilter === 'Expired'
+                            ? 'bg-rose-500/20 border-rose-500 shadow-md ring-2 ring-rose-500/40'
+                            : 'bg-surface border-gray-800 hover:border-rose-500/30'
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1">
+                            <span>✕</span> Expired
+                        </span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-medium">
+                            {totalCount > 0 ? Math.round((expiredCount / totalCount) * 100) : 0}%
+                        </span>
+                    </div>
+                    <div className="text-2xl font-black text-rose-400 mt-1 font-mono">{expiredCount}</div>
+                    <div className="text-[11px] text-text-secondary mt-1">Pending renewal</div>
+                </div>
+
+                {/* Inactive / Archived Records */}
+                <div 
+                    onClick={() => setStatusFilter('Archived')}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                        statusFilter === 'Archived'
+                            ? 'bg-amber-500/20 border-amber-500 shadow-md ring-2 ring-amber-500/40'
+                            : 'bg-surface border-gray-800 hover:border-amber-500/30'
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                            <span>⏱️</span> Inactive (5+ mo)
+                        </span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-medium">
+                            {totalCount > 0 ? Math.round((archivedCount / totalCount) * 100) : 0}%
+                        </span>
+                    </div>
+                    <div className="text-2xl font-black text-amber-400 mt-1 font-mono">{archivedCount}</div>
+                    <div className="text-[11px] text-text-secondary mt-1">Preserved in system</div>
+                </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="bg-surface border border-gray-800 rounded-2xl p-3.5 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+                {/* Search */}
+                <div className="relative flex-1 max-w-md">
                     <input
                         type="text"
-                        placeholder="Search members..."
+                        placeholder="Search any member name, Reg. No (e.g. 1, 001, SF-001)..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="p-2 bg-secondary rounded-lg"
+                        className="w-full pl-9 pr-9 py-2 bg-secondary border border-gray-700/80 rounded-xl text-sm font-medium text-text-primary placeholder-gray-500 outline-none focus:border-primary transition-all"
                     />
-                    <button onClick={handleAddNew} className="bg-primary text-white font-bold py-2 px-4 rounded-lg hover:bg-primary-hover transition-colors">
-                        Add New Member
+                    <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    {searchTerm && (
+                        <button
+                            type="button"
+                            onClick={() => setSearchTerm('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                        >
+                            ✕
+                        </button>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                    {/* Status Tabs */}
+                    <div className="flex items-center bg-secondary/80 p-1 rounded-xl border border-gray-700/80 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('All')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                statusFilter === 'All'
+                                    ? 'bg-primary text-white shadow'
+                                    : 'text-text-secondary hover:text-text-primary'
+                            }`}
+                        >
+                            All ({totalCount})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('Active')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                statusFilter === 'Active'
+                                    ? 'bg-emerald-600 text-white shadow'
+                                    : 'text-text-secondary hover:text-emerald-400'
+                            }`}
+                        >
+                            Active ({activeCount})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('Expired')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                statusFilter === 'Expired'
+                                    ? 'bg-rose-600 text-white shadow'
+                                    : 'text-text-secondary hover:text-rose-400'
+                            }`}
+                        >
+                            Expired ({expiredCount})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('Archived')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                statusFilter === 'Archived'
+                                    ? 'bg-amber-600 text-white shadow'
+                                    : 'text-text-secondary hover:text-amber-400'
+                            }`}
+                        >
+                            Inactive ({archivedCount})
+                        </button>
+                    </div>
+
+                    {/* Gender Filter Tabs */}
+                    <div className="flex items-center bg-secondary/80 p-1 rounded-xl border border-gray-700/80 shrink-0">
+                        <button
+                            onClick={() => setGenderFilter('All')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                genderFilter === 'All'
+                                    ? 'bg-gray-700 text-white shadow'
+                                    : 'text-text-secondary hover:text-text-primary'
+                            }`}
+                        >
+                            Genders
+                        </button>
+                        <button
+                            onClick={() => setGenderFilter('Male')}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                genderFilter === 'Male'
+                                    ? 'bg-blue-600 text-white shadow'
+                                    : 'text-text-secondary hover:text-blue-400'
+                            }`}
+                        >
+                            <span>♂</span>
+                        </button>
+                        <button
+                            onClick={() => setGenderFilter('Female')}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                genderFilter === 'Female'
+                                    ? 'bg-pink-600 text-white shadow'
+                                    : 'text-text-secondary hover:text-pink-400'
+                            }`}
+                        >
+                            <span>♀</span>
+                        </button>
+                    </div>
+
+                    {/* Consistent Member Filter Tab */}
+                    <button
+                        type="button"
+                        onClick={() => setShowOnlyConsistent(!showOnlyConsistent)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                            showOnlyConsistent
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500 shadow-md ring-2 ring-amber-500/30'
+                                : 'bg-secondary/80 text-text-secondary border-gray-700/80 hover:text-amber-300 hover:border-amber-500/40'
+                        }`}
+                        title="Filter members with 5-6+ months consistent gym attendance"
+                    >
+                        <span className="text-amber-400">⭐</span>
+                        <span>Consistent ({consistentCount})</span>
                     </button>
                 </div>
             </div>
-            <div className="bg-surface rounded-lg shadow-lg overflow-hidden">
+
+            <div className="bg-surface rounded-xl shadow-lg border border-gray-800 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-secondary">
+                        <thead className="bg-secondary text-text-secondary text-xs uppercase tracking-wider">
                             <tr>
-                                <th className="p-4">Photo</th>
                                 <th className="p-4">Reg. No</th>
-                                <th className="p-4">Name</th>
+                                <th className="p-4">Member</th>
+                                <th className="p-4">Gender</th>
                                 <th className="p-4">Category</th>
                                 <th className="p-4">Plan</th>
                                 <th className="p-4">Fee Status</th>
-                                <th className="p-4">Expiry Date</th>
+                                <th className="p-4">Expiry & Status</th>
                                 <th className="p-4">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredMembers.map(member => (
-                                <tr key={member.id} className="border-b border-secondary hover:bg-gray-700/50">
-                                    <td className="p-4"><img src={member.photo} alt={member.name} className="h-12 w-12 rounded-full object-cover"/></td>
-                                    <td className="p-4 font-mono text-text-secondary">{member.registrationNo}</td>
-                                    <td className="p-4 font-medium">{member.name}</td>
+                            {filteredMembers.length === 0 ? (
+                                <tr>
+                                    <td colSpan={8} className="text-center p-8 text-text-secondary italic">
+                                        No members found matching your filter criteria.
+                                    </td>
+                                </tr>
+                            ) : filteredMembers.map(member => {
+                                const isArchived = isMemberArchived(member);
+                                const isExpired = new Date(member.expiryDate) < new Date(todayStr);
+                                return (
+                                <tr key={member.id} className={`border-b border-secondary hover:bg-gray-700/50 transition-colors ${isArchived ? 'bg-secondary/30' : ''}`}>
+                                    <td className="p-4 font-mono font-bold text-emerald-400">
+                                        <span className="px-2 py-1 rounded bg-secondary/80 border border-gray-700 font-mono text-xs">
+                                            #{member.registrationNo}
+                                        </span>
+                                    </td>
+                                    <td className="p-4">
+                                        <div>
+                                            <div className="font-medium text-text-primary flex items-center gap-1.5">
+                                                <span>{member.name}</span>
+                                                <ConsistentMemberStar member={member} size="sm" />
+                                                {isArchived && (
+                                                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-medium">
+                                                        Inactive (5+ mo)
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-xs text-text-secondary font-mono">{member.phone}</div>
+                                        </div>
+                                    </td>
+                                    <td className="p-4">
+                                        <GenderBadge gender={member.gender || 'Male'} size="sm" />
+                                    </td>
                                     <td className="p-4">
                                         <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${CATEGORY_COLORS[member.category || 'Strength'] || 'bg-gray-500/20 text-gray-400'}`}>
                                             {member.category || 'Strength'}
@@ -875,27 +1734,68 @@ const Members: React.FC<MembersProps> = ({ members, payments, onAddMember, onUpd
                                     </td>
                                     <td className="p-4">{member.plan}</td>
                                     <td className="p-4">
-                                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${member.feePaid ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                                            {member.feePaid ? 'Paid' : 'Unpaid'}
-                                        </span>
+                                        {(() => {
+                                            const feeDetails = getMemberFeeDetails(member);
+                                            if (feeDetails.isFullyPaid) {
+                                                return (
+                                                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 whitespace-nowrap">
+                                                        ✓ Paid (Rs 0)
+                                                    </span>
+                                                );
+                                            }
+                                            if (feeDetails.isPartial) {
+                                                return (
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                                                            ⏳ Due: Rs {feeDetails.dueAmount.toLocaleString()}
+                                                        </span>
+                                                        <span className="text-[10px] text-gray-400 pl-1 font-mono">
+                                                            Paid: Rs {feeDetails.paidAmount.toLocaleString()}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase bg-red-500/15 text-red-400 border border-red-500/30 whitespace-nowrap">
+                                                    ✕ Unpaid (Rs {feeDetails.dueAmount.toLocaleString()})
+                                                </span>
+                                            );
+                                        })()}
                                     </td>
                                     <td className="p-4">
-                                        <div className="flex items-center">
-                                            <span>{member.expiryDate}</span>
-                                            {isExpiringSoon(member.expiryDate, 1) && (
-                                                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-400" title="Membership is expiring soon!">
-                                                    Expiring
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={`font-mono text-xs ${isExpired ? 'text-rose-400 font-bold' : 'text-text-secondary'}`}>
+                                                    {formatDateDDMMYYYY(member.expiryDate)}
                                                 </span>
-                                            )}
+                                                {isExpiringSoon(member.expiryDate, 1) && !isExpired && (
+                                                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-yellow-500/20 text-yellow-400" title="Membership is expiring soon!">
+                                                        Expiring
+                                                    </span>
+                                                )}
+                                                {isExpired && (
+                                                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                                                        Expired
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span className="text-[10px] text-gray-500 font-mono">
+                                                Joined: {formatDateDDMMYYYY(member.joinDate)}
+                                            </span>
                                         </div>
                                     </td>
                                     <td className="p-4 flex items-center space-x-2">
-                                        <button onClick={() => handleViewReport(member)} className="text-gray-400 hover:text-white" title="View Report"><ReportIcon/></button>
-                                        <button onClick={() => handleEdit(member)} className="text-blue-400 hover:text-blue-300">Edit</button>
-                                        <button onClick={() => handleDeleteRequest(member)} className="text-red-400 hover:text-red-300">Delete</button>
+                                        <button onClick={() => handleViewReport(member)} className="text-gray-400 hover:text-white p-1 rounded cursor-pointer" title="View Report"><ReportIcon/></button>
+                                        <button onClick={() => handleEdit(member)} className="text-blue-400 hover:text-blue-300 px-2 py-1 bg-blue-500/10 rounded cursor-pointer">Edit</button>
+                                        {role === 'Admin' ? (
+                                            <button onClick={() => handleDeleteRequest(member)} className="text-red-400 hover:text-red-300 px-2 py-1 bg-red-500/10 rounded cursor-pointer">Delete</button>
+                                        ) : (
+                                            <span className="text-gray-500 text-[11px] px-2 py-1 bg-gray-800/40 rounded border border-gray-700/50 cursor-not-allowed select-none" title="Admin authority required to delete members">Admin Only</span>
+                                        )}
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

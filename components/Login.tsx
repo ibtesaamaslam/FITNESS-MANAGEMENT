@@ -14,7 +14,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [securityWord, setSecurityWord] = useState('');
-    const [regNo, setRegNo] = useState('');
     const [error, setError] = useState('');
     
     // Configurable Gym Name inline editing state
@@ -36,6 +35,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
     const [isPasswordRevealed, setIsPasswordRevealed] = useState(false);
 
     const handleSaveName = () => {
+        if (role !== 'Admin') {
+            setIsEditingName(false);
+            return;
+        }
         const trimmed = tempName.trim();
         if (trimmed.length > 0) {
             onUpdateGymName(trimmed);
@@ -49,7 +52,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
         setNewPassword('');
         setConfirmPassword('');
         setSecurityWord('');
-        setRegNo('');
         setError('');
 
         if (role === 'Admin') {
@@ -58,23 +60,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
         } else if (role === 'Manager') {
             const stored = localStorage.getItem('gym_auth_manager');
             setIsSetupMode(!stored);
-        } else {
-            setIsSetupMode(false);
         }
     }, [role]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-
-        if (role === 'Member') {
-            if (regNo.trim().length > 0) {
-                onLogin('Member');
-            } else {
-                setError('Please enter a Registration Number');
-            }
-            return;
-        }
 
         if (isSetupMode) {
             // First time setup logic
@@ -164,8 +155,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
     };
 
     return (
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
-            <div className="bg-surface p-8 rounded-lg shadow-2xl w-full max-w-md border border-gray-700">
+        <div className="w-full h-full min-h-full flex-1 flex flex-col items-center justify-center p-4 bg-background overflow-y-auto">
+            <div className="bg-surface p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700/80 my-auto">
                 <div className="text-center mb-8">
                     <div className="bg-primary/20 p-4 rounded-full w-20 h-20 mx-auto flex items-center justify-center mb-4">
                         <LockIcon className="h-10 w-10 text-primary" />
@@ -186,16 +177,18 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
                     ) : (
                         <div className="relative flex items-center justify-center max-w-xs mx-auto group mb-1">
                             <h1 className="text-3xl font-bold text-text-primary text-center px-8">{gymName}</h1>
-                            <button
-                                type="button"
-                                onClick={() => { setTempName(gymName); setIsEditingName(true); }}
-                                className="absolute right-0 p-1.5 hover:bg-secondary rounded-lg text-text-secondary hover:text-text-primary transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer"
-                                title="Rename Gym Branding"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                </svg>
-                            </button>
+                            {role === 'Admin' && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setTempName(gymName); setIsEditingName(true); }}
+                                    className="absolute right-0 p-1.5 hover:bg-secondary rounded-lg text-text-secondary hover:text-text-primary transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer"
+                                    title="Rename Gym Branding (Admin Only)"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                </button>
+                            )}
                         </div>
                     )}
                     <p className="text-text-secondary">Gym Management System</p>
@@ -203,20 +196,64 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-2">Select Role</label>
-                        <div className="grid grid-cols-3 gap-2 bg-secondary p-1 rounded-lg">
-                            {(['Admin', 'Manager', 'Member'] as Role[]).map((r) => (
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-sm font-medium text-text-secondary">Select Role</label>
+                            <span className="text-[11px] text-text-secondary font-medium">Distinct Permissions</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 bg-secondary p-1.5 rounded-xl border border-gray-800">
+                            {(['Admin', 'Manager'] as Role[]).map((r) => (
                                 <button
                                     key={r}
                                     type="button"
                                     onClick={() => setRole(r)}
-                                    className={`py-2 text-sm font-medium rounded-md transition-colors ${
-                                        role === r ? 'bg-primary text-white shadow' : 'text-text-secondary hover:text-text-primary'
+                                    className={`py-2.5 px-3 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                                        role === r 
+                                            ? r === 'Admin'
+                                                ? 'bg-primary text-white shadow-lg shadow-emerald-900/30'
+                                                : 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
+                                            : 'text-text-secondary hover:text-text-primary hover:bg-surface/50'
                                     }`}
                                 >
-                                    {r}
+                                    {r === 'Admin' ? (
+                                        <>
+                                            <span className="text-base">👑</span>
+                                            <span>Admin</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="text-base">🛡️</span>
+                                            <span>Manager</span>
+                                        </>
+                                    )}
                                 </button>
                             ))}
+                        </div>
+
+                        {/* Role Boundary Summary Card */}
+                        <div className={`mt-2.5 p-2.5 rounded-lg border text-xs leading-relaxed transition-all ${
+                            role === 'Admin'
+                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                                : 'bg-blue-500/10 border-blue-500/20 text-blue-300'
+                        }`}>
+                            {role === 'Admin' ? (
+                                <div className="space-y-0.5">
+                                    <p className="font-bold flex items-center gap-1.5 text-emerald-400">
+                                        <span>👑 Super Admin / Owner:</span>
+                                    </p>
+                                    <p className="text-[11px] text-emerald-200/80">
+                                        Full authority: Financial Reports, Staff Payroll & Salaries, Backup & Restore, and record deletion.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-0.5">
+                                    <p className="font-bold flex items-center gap-1.5 text-blue-400">
+                                        <span>🛡️ Operations Manager:</span>
+                                    </p>
+                                    <p className="text-[11px] text-blue-200/80">
+                                        Floor management: Member Admissions, Daily Fees & POS, Attendance, and Daily Expenses (No deletions or system backups).
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -311,19 +348,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
                         </div>
                     )}
 
-                    {role === 'Member' && (
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-2">Registration Number</label>
-                            <input
-                                type="text"
-                                value={regNo}
-                                onChange={(e) => setRegNo(e.target.value)}
-                                className="w-full p-3 bg-secondary rounded-lg border border-gray-700 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                placeholder="e.g. SF-001"
-                            />
-                        </div>
-                    )}
-
                     {error && (
                         <div className="text-red-400 text-sm text-center bg-red-400/10 p-3 rounded-lg border border-red-400/20">
                             {error}
@@ -332,9 +356,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
 
                     <button
                         type="submit"
-                        className="w-full bg-primary text-white font-bold py-3 px-4 rounded-lg hover:bg-primary-hover transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+                        className={`w-full text-white font-bold py-3 px-4 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-lg ${
+                            role === 'Admin'
+                                ? 'bg-primary hover:bg-primary-hover shadow-emerald-900/30'
+                                : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/30'
+                        }`}
                     >
-                        {isSetupMode && (role === 'Admin' || role === 'Manager') ? 'Set Password & Login' : 'Login'}
+                        {isSetupMode ? `Set ${role} Password & Login` : `Login as ${role}`}
                     </button>
                 </form>
             </div>

@@ -13,10 +13,10 @@ const sortMembersByRegNo = (list: Member[]): Member[] => {
 const ensureMemberCheckInTimes = (list: Member[]): Member[] => {
     const todayStr = getLocalDateString();
     return list.map(m => {
-        const att = m.attendance || {};
+        const att = { ...(m.attendance || {}) };
         const times = { ...(m.checkInTimes || {}) };
         const outTimes = { ...(m.checkOutTimes || {}) };
-        let changed = false;
+        let changed = !m.attendance || !m.checkInTimes || !m.checkOutTimes;
         Object.entries(att).forEach(([date, present]) => {
             if (present && !times[date]) {
                 const regNum = parseInt((m.registrationNo || '1').replace(/\D/g, '') || '1', 10);
@@ -52,7 +52,12 @@ const ensureMemberCheckInTimes = (list: Member[]): Member[] => {
                 }
             }
         });
-        return changed ? { ...m, checkInTimes: times, checkOutTimes: outTimes } : m;
+        return {
+            ...m,
+            attendance: att,
+            checkInTimes: times,
+            checkOutTimes: outTimes
+        };
     });
 };
 
@@ -513,6 +518,57 @@ export const useGymData = () => {
             };
         })));
     }, []);
+
+    const batchUpdateAttendance = useCallback((memberIds: string[], date: string, present: boolean) => {
+        const idSet = new Set(memberIds);
+        const nowTime = new Date().toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        });
+
+        setMembers(prev => sortMembersByRegNo(prev.map(m => {
+            if (!idSet.has(m.id)) return m;
+            const updatedAtt = { ...(m.attendance || {}), [date]: present };
+            const updatedTimes = { ...(m.checkInTimes || {}) };
+            const updatedCheckOutTimes = { ...(m.checkOutTimes || {}) };
+
+            if (!present) {
+                delete updatedTimes[date];
+                delete updatedCheckOutTimes[date];
+            } else {
+                if (!updatedTimes[date]) {
+                    updatedTimes[date] = nowTime;
+                }
+            }
+
+            return {
+                ...m,
+                attendance: updatedAtt,
+                checkInTimes: updatedTimes,
+                checkOutTimes: updatedCheckOutTimes
+            };
+        })));
+    }, []);
+
+    const clearAttendanceForDate = useCallback((date: string) => {
+        setMembers(prev => sortMembersByRegNo(prev.map(m => {
+            if (!m.attendance || m.attendance[date] === undefined) return m;
+            const updatedAtt = { ...(m.attendance || {}) };
+            delete updatedAtt[date];
+            const updatedTimes = { ...(m.checkInTimes || {}) };
+            delete updatedTimes[date];
+            const updatedCheckOutTimes = { ...(m.checkOutTimes || {}) };
+            delete updatedCheckOutTimes[date];
+            return {
+                ...m,
+                attendance: updatedAtt,
+                checkInTimes: updatedTimes,
+                checkOutTimes: updatedCheckOutTimes
+            };
+        })));
+    }, []);
     
     const toggleReminder = useCallback((memberId: string, enabled: boolean) => {
         setMembers(prev => sortMembersByRegNo(prev.map(m => 
@@ -791,6 +847,8 @@ export const useGymData = () => {
         sellAccessoryItem,
         deleteAccessorySale,
         updateAttendance,
+        batchUpdateAttendance,
+        clearAttendanceForDate,
         updateCheckOut,
         checkOutAllActiveMembers,
         toggleReminder,

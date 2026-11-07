@@ -95,13 +95,13 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
   const femaleMembers = nonArchivedMembers.filter(m => m.gender === 'Female').length;
 
   const todayStr = getLocalDateString();
-  const activeMembers = nonArchivedMembers.filter(m => new Date(m.expiryDate) >= new Date(todayStr)).length;
-  const activeMale = nonArchivedMembers.filter(m => (m.gender || 'Male') === 'Male' && new Date(m.expiryDate) >= new Date(todayStr)).length;
-  const activeFemale = nonArchivedMembers.filter(m => m.gender === 'Female' && new Date(m.expiryDate) >= new Date(todayStr)).length;
+  const activeMembers = nonArchivedMembers.filter(m => m.expiryDate && new Date(m.expiryDate) >= new Date(todayStr)).length;
+  const activeMale = nonArchivedMembers.filter(m => (m.gender || 'Male') === 'Male' && m.expiryDate && new Date(m.expiryDate) >= new Date(todayStr)).length;
+  const activeFemale = nonArchivedMembers.filter(m => m.gender === 'Female' && m.expiryDate && new Date(m.expiryDate) >= new Date(todayStr)).length;
 
-  const todaysAttendance = nonArchivedMembers.map(m => m.attendance[todayStr]).filter(Boolean).length;
-  const todayMaleAttendance = nonArchivedMembers.filter(m => (m.gender || 'Male') === 'Male' && m.attendance[todayStr]).length;
-  const todayFemaleAttendance = nonArchivedMembers.filter(m => m.gender === 'Female' && m.attendance[todayStr]).length;
+  const todaysAttendance = nonArchivedMembers.filter(m => !!m.attendance?.[todayStr]).length;
+  const todayMaleAttendance = nonArchivedMembers.filter(m => (m.gender || 'Male') === 'Male' && !!m.attendance?.[todayStr]).length;
+  const todayFemaleAttendance = nonArchivedMembers.filter(m => m.gender === 'Female' && !!m.attendance?.[todayStr]).length;
   
   const currentMonth = getLocalMonthString();
 
@@ -137,8 +137,8 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dateStr = getLocalDateString(d);
-      const maleCount = nonArchivedMembers.filter(m => (m.gender || 'Male') === 'Male' && m.attendance[dateStr]).length;
-      const femaleCount = nonArchivedMembers.filter(m => m.gender === 'Female' && m.attendance[dateStr]).length;
+      const maleCount = nonArchivedMembers.filter(m => (m.gender || 'Male') === 'Male' && !!m.attendance?.[dateStr]).length;
+      const femaleCount = nonArchivedMembers.filter(m => m.gender === 'Female' && !!m.attendance?.[dateStr]).length;
       const totalCount = maleCount + femaleCount;
       return {
         name: d.toLocaleDateString('en-US', { weekday: 'short' }),
