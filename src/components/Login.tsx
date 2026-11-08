@@ -155,11 +155,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
     };
 
     return (
-        <div className="w-full h-full min-h-full flex-1 flex flex-col items-center justify-center p-4 bg-background overflow-y-auto">
-            <div className="bg-surface p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700/80 my-auto">
-                <div className="text-center mb-8">
-                    <div className="bg-primary/20 p-4 rounded-full w-20 h-20 mx-auto flex items-center justify-center mb-4">
-                        <LockIcon className="h-10 w-10 text-primary" />
+        <div className="w-full h-screen max-h-screen flex flex-col items-center justify-center p-3 sm:p-4 bg-background overflow-hidden select-none">
+            <div className={`bg-surface rounded-2xl shadow-2xl w-full max-w-md border border-gray-700/80 transition-all ${
+                isSetupMode ? 'p-5 sm:p-6' : 'p-6 sm:p-8'
+            }`}>
+                <div className={`text-center ${isSetupMode ? 'mb-3' : 'mb-6'}`}>
+                    <div className={`bg-primary/20 rounded-full mx-auto flex items-center justify-center transition-all ${
+                        isSetupMode ? 'w-12 h-12 p-2.5 mb-2' : 'w-16 h-16 p-3.5 mb-3'
+                    }`}>
+                        <LockIcon className={`${isSetupMode ? 'h-6 w-6' : 'h-8 w-8'} text-primary`} />
                     </div>
                     {isEditingName ? (
                         <div className="flex items-center gap-2 mb-1 justify-center">
@@ -169,14 +173,14 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
                                 onChange={(e) => setTempName(e.target.value)}
                                 onBlur={handleSaveName}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
-                                className="bg-secondary text-text-primary text-center font-bold px-3 py-1.5 rounded-lg border border-primary outline-none text-2xl w-full"
+                                className="bg-secondary text-text-primary text-center font-bold px-3 py-1 rounded-lg border border-primary outline-none text-xl w-full"
                                 autoFocus
                                 required
                             />
                         </div>
                     ) : (
-                        <div className="relative flex items-center justify-center max-w-xs mx-auto group mb-1">
-                            <h1 className="text-3xl font-bold text-text-primary text-center px-8">{gymName}</h1>
+                        <div className="relative flex items-center justify-center max-w-xs mx-auto group mb-0.5">
+                            <h1 className={`${isSetupMode ? 'text-2xl' : 'text-3xl'} font-bold text-text-primary text-center px-8`}>{gymName}</h1>
                             {role === 'Admin' && (
                                 <button
                                     type="button"
@@ -191,22 +195,22 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
                             )}
                         </div>
                     )}
-                    <p className="text-text-secondary">Gym Management System</p>
+                    <p className="text-xs text-text-secondary">Gym Management System</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className={isSetupMode ? "space-y-3" : "space-y-5"}>
                     <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="block text-sm font-medium text-text-secondary">Select Role</label>
-                            <span className="text-[11px] text-text-secondary font-medium">Distinct Permissions</span>
+                        <div className="flex justify-between items-center mb-1.5">
+                            <label className="block text-xs font-semibold text-text-secondary">Select Role</label>
+                            <span className="text-[10px] text-text-secondary font-medium">Distinct Permissions</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 bg-secondary p-1.5 rounded-xl border border-gray-800">
+                        <div className="grid grid-cols-2 gap-2 bg-secondary p-1 rounded-xl border border-gray-800">
                             {(['Admin', 'Manager'] as Role[]).map((r) => (
                                 <button
                                     key={r}
                                     type="button"
                                     onClick={() => setRole(r)}
-                                    className={`py-2.5 px-3 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                                    className={`py-1.5 px-3 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
                                         role === r 
                                             ? r === 'Admin'
                                                 ? 'bg-primary text-white shadow-lg shadow-emerald-900/30'
@@ -216,12 +220,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
                                 >
                                     {r === 'Admin' ? (
                                         <>
-                                            <span className="text-base">👑</span>
+                                            <span className="text-sm">👑</span>
                                             <span>Admin</span>
                                         </>
                                     ) : (
                                         <>
-                                            <span className="text-base">🛡️</span>
+                                            <span className="text-sm">🛡️</span>
                                             <span>Manager</span>
                                         </>
                                     )}
@@ -230,27 +234,27 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
                         </div>
 
                         {/* Role Boundary Summary Card */}
-                        <div className={`mt-2.5 p-2.5 rounded-lg border text-xs leading-relaxed transition-all ${
+                        <div className={`mt-2 p-2 rounded-lg border text-xs leading-tight transition-all ${
                             role === 'Admin'
                                 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
                                 : 'bg-blue-500/10 border-blue-500/20 text-blue-300'
                         }`}>
                             {role === 'Admin' ? (
                                 <div className="space-y-0.5">
-                                    <p className="font-bold flex items-center gap-1.5 text-emerald-400">
+                                    <p className="font-bold flex items-center gap-1.5 text-emerald-400 text-xs">
                                         <span>👑 Super Admin / Owner:</span>
                                     </p>
                                     <p className="text-[11px] text-emerald-200/80">
-                                        Full authority: Financial Reports, Staff Payroll & Salaries, Backup & Restore, and record deletion.
+                                        Full authority: Financial Reports, Staff Payroll, Backup & Restore, and Deletion.
                                     </p>
                                 </div>
                             ) : (
                                 <div className="space-y-0.5">
-                                    <p className="font-bold flex items-center gap-1.5 text-blue-400">
+                                    <p className="font-bold flex items-center gap-1.5 text-blue-400 text-xs">
                                         <span>🛡️ Operations Manager:</span>
                                     </p>
                                     <p className="text-[11px] text-blue-200/80">
-                                        Floor management: Member Admissions, Daily Fees & POS, Attendance, and Daily Expenses (No deletions or system backups).
+                                        Floor management: Member Admissions, Daily Fees & POS, Attendance, and Daily Expenses.
                                     </p>
                                 </div>
                             )}
@@ -258,67 +262,74 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
                     </div>
 
                     {(role === 'Admin' || role === 'Manager') && (
-                        <div className="space-y-4">
+                        <div>
                             {isSetupMode ? (
-                                <div className="animate-fade-in-up">
-                                    <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg text-sm text-blue-200 mb-4">
-                                        <strong>Welcome!</strong> Please set a password for the {role} account to continue.
+                                <div className="space-y-2.5 animate-fade-in-up">
+                                    <div className="bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-lg text-xs text-blue-200">
+                                        <strong>Welcome!</strong> Set initial password for the <strong>{role}</strong> account to continue.
                                     </div>
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-medium text-text-secondary mb-2">New Password</label>
-                                        <div className="relative">
-                                            <input
-                                                type={showSetupNewPassword ? "text" : "password"}
-                                                value={newPassword}
-                                                onChange={(e) => setNewPassword(e.target.value)}
-                                                className="w-full p-3 pr-16 bg-secondary rounded-lg border border-gray-700 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                                placeholder="Create password"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowSetupNewPassword(!showSetupNewPassword)}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-text-secondary hover:text-text-primary px-2 py-1 rounded bg-surface/80 border border-gray-700/60 hover:bg-secondary transition-colors cursor-pointer"
-                                            >
-                                                {showSetupNewPassword ? 'Hide' : 'Show'}
-                                            </button>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-xs font-medium text-text-secondary mb-1">New Password</label>
+                                            <div className="relative">
+                                                <input
+                                                    type={showSetupNewPassword ? "text" : "password"}
+                                                    value={newPassword}
+                                                    onChange={(e) => setNewPassword(e.target.value)}
+                                                    className="w-full py-1.5 pl-2.5 pr-11 bg-secondary rounded-lg border border-gray-700 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-xs sm:text-sm"
+                                                    placeholder="Create password"
+                                                    required
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowSetupNewPassword(!showSetupNewPassword)}
+                                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-text-secondary hover:text-text-primary px-1.5 py-0.5 rounded bg-surface/80 border border-gray-700/60 hover:bg-secondary transition-colors cursor-pointer"
+                                                >
+                                                    {showSetupNewPassword ? 'Hide' : 'Show'}
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-medium text-text-secondary mb-2">Confirm Password</label>
-                                        <div className="relative">
-                                            <input
-                                                type={showSetupConfirmPassword ? "text" : "password"}
-                                                value={confirmPassword}
-                                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                                className="w-full p-3 pr-16 bg-secondary rounded-lg border border-gray-700 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                                placeholder="Confirm password"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowSetupConfirmPassword(!showSetupConfirmPassword)}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-text-secondary hover:text-text-primary px-2 py-1 rounded bg-surface/80 border border-gray-700/60 hover:bg-secondary transition-colors cursor-pointer"
-                                            >
-                                                {showSetupConfirmPassword ? 'Hide' : 'Show'}
-                                            </button>
+                                        <div>
+                                            <label className="block text-xs font-medium text-text-secondary mb-1">Confirm Password</label>
+                                            <div className="relative">
+                                                <input
+                                                    type={showSetupConfirmPassword ? "text" : "password"}
+                                                    value={confirmPassword}
+                                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                                    className="w-full py-1.5 pl-2.5 pr-11 bg-secondary rounded-lg border border-gray-700 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-xs sm:text-sm"
+                                                    placeholder="Confirm password"
+                                                    required
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowSetupConfirmPassword(!showSetupConfirmPassword)}
+                                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-text-secondary hover:text-text-primary px-1.5 py-0.5 rounded bg-surface/80 border border-gray-700/60 hover:bg-secondary transition-colors cursor-pointer"
+                                                >
+                                                    {showSetupConfirmPassword ? 'Hide' : 'Show'}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-text-secondary mb-2">Secret Reset Word (Required for password recovery)</label>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <label className="block text-xs font-medium text-text-secondary">Secret Reset Word</label>
+                                            <span className="text-[10px] text-text-secondary">For password recovery</span>
+                                        </div>
                                         <input
                                             type="text"
                                             value={securityWord}
                                             onChange={(e) => setSecurityWord(e.target.value)}
-                                            className="w-full p-3 bg-secondary rounded-lg border border-gray-700 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                                            className="w-full py-1.5 px-2.5 bg-secondary rounded-lg border border-gray-700 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-xs sm:text-sm"
                                             placeholder="Enter secret word (e.g. AtlasSafe)"
                                             required
                                         />
-                                        <p className="text-xs text-text-secondary mt-1">When resetting this password, you must enter this exact word.</p>
+                                        <p className="text-[10px] text-text-secondary mt-0.5">Remember this exact word if you ever need to reset the password.</p>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="animate-fade-in-up">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <label className="block text-sm font-medium text-text-secondary">Password</label>
+                                <div className="space-y-1.5 animate-fade-in-up">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="block text-xs font-medium text-text-secondary">Password</label>
                                         <button 
                                             type="button" 
                                             onClick={handleOpenResetPopup}
@@ -332,13 +343,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
                                             type={showLoginPassword ? "text" : "password"}
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
-                                            className="w-full p-3 pr-16 bg-secondary rounded-lg border border-gray-700 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                                            className="w-full py-2.5 px-3 pr-14 bg-secondary rounded-lg border border-gray-700 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
                                             placeholder="Enter password"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowLoginPassword(!showLoginPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-text-secondary hover:text-text-primary px-2 py-1 rounded bg-surface/80 border border-gray-700/60 hover:bg-secondary transition-colors cursor-pointer"
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-text-secondary hover:text-text-primary px-2 py-1 rounded bg-surface/80 border border-gray-700/60 hover:bg-secondary transition-colors cursor-pointer"
                                         >
                                             {showLoginPassword ? 'Hide' : 'Show'}
                                         </button>
@@ -349,14 +360,14 @@ const Login: React.FC<LoginProps> = ({ onLogin, gymName, onUpdateGymName }) => {
                     )}
 
                     {error && (
-                        <div className="text-red-400 text-sm text-center bg-red-400/10 p-3 rounded-lg border border-red-400/20">
+                        <div className="text-red-400 text-xs text-center bg-red-400/10 p-2 rounded-lg border border-red-400/20">
                             {error}
                         </div>
                     )}
 
                     <button
                         type="submit"
-                        className={`w-full text-white font-bold py-3 px-4 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-lg ${
+                        className={`w-full text-white font-bold py-2.5 px-4 rounded-lg transition-all transform hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-lg text-sm ${
                             role === 'Admin'
                                 ? 'bg-primary hover:bg-primary-hover shadow-emerald-900/30'
                                 : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/30'
