@@ -81,7 +81,7 @@ const Attendance: React.FC<AttendanceProps> = ({
     return members.map(member => ({
       ...member,
       gender: member.gender || 'Male',
-      present: !!member.attendance?.[selectedDate],
+      present: member.attendance?.[selectedDate] === true,
     }));
   }, [members, selectedDate]);
 
@@ -256,6 +256,16 @@ const Attendance: React.FC<AttendanceProps> = ({
             max={getLocalDateString()}
             id="attendance-date"
           />
+          {selectedDate !== getLocalDateString() && (
+            <button
+              type="button"
+              onClick={() => setSelectedDate(getLocalDateString())}
+              className="px-2.5 py-1 bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
+              title="Return to today's date"
+            >
+              Today
+            </button>
+          )}
         </div>
       </div>
 

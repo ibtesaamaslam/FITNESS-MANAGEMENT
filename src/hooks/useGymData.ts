@@ -66,32 +66,44 @@ const DEFAULT_STAFF: StaffMember[] = [];
 export const useGymData = () => {
     const [members, setMembers] = useState<Member[]>(() => {
         try {
-            const storedMembers = localStorage.getItem('gymMembers');
+            const storedMembers = localStorage.getItem('gymMembers') || localStorage.getItem('gymMembers_backup');
             const parsed = storedMembers ? JSON.parse(storedMembers) : [];
             return sortMembersByRegNo(ensureMemberCheckInTimes(parsed));
         } catch (error) {
-            console.error("Failed to parse members from localStorage", error);
+            console.error("Failed to parse members from localStorage, checking safety backup", error);
+            try {
+                const backup = localStorage.getItem('gymMembers_backup');
+                if (backup) {
+                    return sortMembersByRegNo(ensureMemberCheckInTimes(JSON.parse(backup)));
+                }
+            } catch (e2) {
+                console.error("Backup parse also failed", e2);
+            }
             return [];
         }
     });
 
     const [payments, setPayments] = useState<Payment[]>(() => {
         try {
-            const storedPayments = localStorage.getItem('gymPayments');
+            const storedPayments = localStorage.getItem('gymPayments') || localStorage.getItem('gymPayments_backup');
             if (!storedPayments) return [];
             const parsedPayments: Payment[] = JSON.parse(storedPayments);
             // Deduplicate by ID
             const uniquePayments: Payment[] = [];
             const seenIds = new Set<string>();
             parsedPayments.forEach(p => {
-                if (!seenIds.has(p.id)) {
+                if (p && p.id && !seenIds.has(p.id)) {
                     uniquePayments.push(p);
                     seenIds.add(p.id);
                 }
             });
             return uniquePayments;
         } catch (error) {
-            console.error("Failed to parse payments from localStorage", error);
+            console.error("Failed to parse payments from localStorage, checking safety backup", error);
+            try {
+                const b = localStorage.getItem('gymPayments_backup');
+                if (b) return JSON.parse(b);
+            } catch {}
             return [];
         }
     });
@@ -186,7 +198,15 @@ export const useGymData = () => {
 
     useEffect(() => {
         try {
-            localStorage.setItem('gymMembers', JSON.stringify(members));
+            if (members.length > 0) {
+                localStorage.setItem('gymMembers', JSON.stringify(members));
+                localStorage.setItem('gymMembers_backup', JSON.stringify(members));
+            } else {
+                const existing = localStorage.getItem('gymMembers');
+                if (!existing || existing === '[]') {
+                    localStorage.setItem('gymMembers', JSON.stringify([]));
+                }
+            }
         } catch (error) {
             console.error("Failed to save members to localStorage", error);
         }
@@ -194,7 +214,15 @@ export const useGymData = () => {
     
     useEffect(() => {
         try {
-            localStorage.setItem('gymPayments', JSON.stringify(payments));
+            if (payments.length > 0) {
+                localStorage.setItem('gymPayments', JSON.stringify(payments));
+                localStorage.setItem('gymPayments_backup', JSON.stringify(payments));
+            } else {
+                const existing = localStorage.getItem('gymPayments');
+                if (!existing || existing === '[]') {
+                    localStorage.setItem('gymPayments', JSON.stringify([]));
+                }
+            }
         } catch (error) {
             console.error("Failed to save payments to localStorage", error);
         }
@@ -341,7 +369,25 @@ export const useGymData = () => {
     }, []);
 
     const deletePayment = useCallback((id: string) => {
-        setPayments(prev => prev.filter(p => p.id !== id));
+        setPayments(prev => {
+            const pToDelete = prev.find(p => p.id === id);
+            if (pToDelete && pToDelete.memberId) {
+                setMembers(prevMembers => prevMembers.map(m => {
+                    if (m.id !== pToDelete.memberId) return m;
+                    const fee = Number(m.fee) || 0;
+                    const currentPaid = m.feePaid ? fee : Math.max(0, Number(m.paidAmount) || 0);
+                    const newPaid = Math.max(0, currentPaid - pToDelete.amount);
+                    const isFullyPaid = newPaid >= fee && fee > 0;
+                    return {
+                        ...m,
+                        feePaid: isFullyPaid,
+                        paidAmount: newPaid,
+                        pendingDue: Math.max(0, fee - newPaid)
+                    };
+                }));
+            }
+            return prev.filter(p => p.id !== id);
+        });
     }, []);
 
     const addExpense = useCallback((expenseData: Omit<Expense, 'id'>) => {
@@ -767,7 +813,9 @@ export const useGymData = () => {
 
             // Immediate storage persist
             localStorage.setItem('gymMembers', JSON.stringify(finalMembers));
+            localStorage.setItem('gymMembers_backup', JSON.stringify(finalMembers));
             localStorage.setItem('gymPayments', JSON.stringify(finalPayments));
+            localStorage.setItem('gymPayments_backup', JSON.stringify(finalPayments));
             localStorage.setItem('gymExpenses', JSON.stringify(finalExpenses));
             localStorage.setItem('gymAccessories', JSON.stringify(finalAccessories));
             localStorage.setItem('gymAccessorySales', JSON.stringify(finalSales));

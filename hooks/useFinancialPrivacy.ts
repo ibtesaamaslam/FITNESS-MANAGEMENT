@@ -68,13 +68,7 @@ export const useFinancialPrivacy = () => {
     return false;
   }, [financialPassword]);
 
-  const setInitialPassword = useCallback((newPass: string, adminPass?: string): { success: boolean; message: string } => {
-    if (adminPass !== undefined) {
-      const storedAdminPass = localStorage.getItem('gym_auth_admin') || 'admin';
-      if (adminPass !== storedAdminPass) {
-        return { success: false, message: 'Incorrect Admin password.' };
-      }
-    }
+  const setInitialPassword = useCallback((newPass: string): { success: boolean; message: string } => {
     if (!newPass || newPass.trim().length < 3) {
       return { success: false, message: 'Password must be at least 3 characters long.' };
     }

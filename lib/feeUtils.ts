@@ -18,7 +18,7 @@ export const getMemberFeeDetails = (member: {
   
   // If explicitly marked as full feePaid
   if (member.feePaid) {
-    const paidAmount = member.paidAmount !== undefined ? Number(member.paidAmount) : fee;
+    const paidAmount = (member.paidAmount !== undefined && Number(member.paidAmount) >= fee) ? Number(member.paidAmount) : fee;
     return {
       status: 'Paid',
       fee,

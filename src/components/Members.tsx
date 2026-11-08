@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Member, Payment, Role } from '../types';
 import { CloseIcon, ReportIcon } from './icons';
-import { getLocalDateString, isMemberArchived, parseLocalDate, isConsistentMember, formatDateDDMMYYYY } from '../lib/dateUtils';
+import { getLocalDateString, isMemberArchived, parseLocalDate, isConsistentMember, formatDateDDMMYYYY, isDateExpired } from '../lib/dateUtils';
 import { DateInputDDMMYYYY } from './DateInputDDMMYYYY';
 import { getMemberFeeDetails } from '../lib/feeUtils';
 import { ConsistentMemberStar } from './ConsistentMemberStar';
@@ -1247,8 +1247,8 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
     const totalCount = members.length;
     const maleCount = useMemo(() => members.filter(m => (m.gender || 'Male') === 'Male').length, [members]);
     const femaleCount = useMemo(() => members.filter(m => m.gender === 'Female').length, [members]);
-    const activeCount = useMemo(() => members.filter(m => new Date(m.expiryDate) >= new Date(todayStr) && !isMemberArchived(m)).length, [members, todayStr]);
-    const expiredCount = useMemo(() => members.filter(m => new Date(m.expiryDate) < new Date(todayStr) && !isMemberArchived(m)).length, [members, todayStr]);
+    const activeCount = useMemo(() => members.filter(m => !isDateExpired(m.expiryDate, todayStr) && !isMemberArchived(m, todayStr)).length, [members, todayStr]);
+    const expiredCount = useMemo(() => members.filter(m => isDateExpired(m.expiryDate, todayStr) && !isMemberArchived(m, todayStr)).length, [members, todayStr]);
     const archivedCount = useMemo(() => members.filter(m => isMemberArchived(m)).length, [members]);
     const consistentCount = useMemo(() => members.filter(m => isConsistentMember(m, todayStr)).length, [members, todayStr]);
 
@@ -1325,8 +1325,8 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
 
         const meetsStatus = (m: Member) => {
             if (statusFilter === 'All') return true;
-            const isArch = isMemberArchived(m);
-            const isExp = new Date(m.expiryDate) < new Date(todayStr);
+            const isArch = isMemberArchived(m, todayStr);
+            const isExp = isDateExpired(m.expiryDate, todayStr);
             if (statusFilter === 'Active') return !isArch && !isExp;
             if (statusFilter === 'Expired') return !isArch && isExp;
             if (statusFilter === 'Archived') return isArch;
@@ -1407,7 +1407,7 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
 
                 const isMatch = isNumericMatch || isExactRegMatch || isSignificantNameMatch;
                 const todayStr = getLocalDateString();
-                const isExpired = new Date(m.expiryDate) < new Date(todayStr);
+                const isExpired = isDateExpired(m.expiryDate, todayStr);
                 
                 return isMatch && isExpired;
             });
@@ -1701,8 +1701,8 @@ const Members: React.FC<MembersProps> = ({ members, payments, role = 'Admin', on
                                     </td>
                                 </tr>
                             ) : filteredMembers.map(member => {
-                                const isArchived = isMemberArchived(member);
-                                const isExpired = new Date(member.expiryDate) < new Date(todayStr);
+                                const isArchived = isMemberArchived(member, todayStr);
+                                const isExpired = isDateExpired(member.expiryDate, todayStr);
                                 return (
                                 <tr key={member.id} className={`border-b border-secondary hover:bg-gray-700/50 transition-colors ${isArchived ? 'bg-secondary/30' : ''}`}>
                                     <td className="p-4 font-mono font-bold text-emerald-400">

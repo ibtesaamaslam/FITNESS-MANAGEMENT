@@ -63,10 +63,28 @@ export const parseLocalDate = (dateStr: string): Date => {
 };
 
 /**
- * Returns whether a member is archived (inactive/absent for 5+ months).
+ * Safely checks if an expiryDate is in the past compared to todayStr (YYYY-MM-DD).
+ * Direct ISO string comparison avoids UTC/local timezone date shifts.
  */
-export const isMemberArchived = (member: { joinDate: string; attendance?: { [date: string]: boolean } }, todayStr: string = getLocalDateString()): boolean => {
+export const isDateExpired = (expiryDate?: string | null, todayStr: string = getLocalDateString()): boolean => {
+  if (!expiryDate || expiryDate.trim() === '') return true;
+  return expiryDate.trim() < todayStr;
+};
+
+/**
+ * Returns whether a member is archived (inactive/absent for 5+ months).
+ * Active members with valid future memberships are NEVER archived.
+ */
+export const isMemberArchived = (
+  member?: { joinDate?: string; expiryDate?: string; attendance?: { [date: string]: boolean } } | null, 
+  todayStr: string = getLocalDateString()
+): boolean => {
   if (!member) return false;
+  // If membership is paid/active today or into the future, never archive
+  if (member.expiryDate && member.expiryDate >= todayStr) {
+    return false;
+  }
+
   const attendance = member.attendance || {};
   const attendanceDates = Object.entries(attendance)
     .filter(([_, present]) => Boolean(present))
@@ -74,15 +92,16 @@ export const isMemberArchived = (member: { joinDate: string; attendance?: { [dat
   
   let lastActivityDateStr = member.joinDate;
   if (attendanceDates.length > 0) {
-    const sorted = attendanceDates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    const sorted = attendanceDates.sort((a, b) => b.localeCompare(a));
     lastActivityDateStr = sorted[0];
   }
   
   if (!lastActivityDateStr) return false;
-  const lastActivity = new Date(lastActivityDateStr);
-  const today = new Date(todayStr);
-  const diffTime = Math.abs(today.getTime() - lastActivity.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const lastActivity = parseLocalDate(lastActivityDateStr);
+  const today = parseLocalDate(todayStr);
+  if (lastActivity > today) return false; // Future dates are not past inactivity
+  const diffTime = today.getTime() - lastActivity.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   
   return diffDays >= 150; // 5 months threshold
 };
