@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Member, Payment, View, AccessorySale, Role } from '../types';
 import { 
@@ -116,6 +116,30 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
   const [showAllRecent, setShowAllRecent] = useState(false);
   const [showAllOverdue, setShowAllOverdue] = useState(false);
+  const middleRowRef = useRef<HTMLDivElement>(null);
+  const [lockedMiddleHeight, setLockedMiddleHeight] = useState<number | null>(null);
+
+  const isAnyExpanded = showAllRecent || showAllOverdue;
+
+  const handleToggleRecent = () => {
+    const next = !showAllRecent;
+    if (next && !showAllOverdue && middleRowRef.current && window.innerWidth >= 1024) {
+      setLockedMiddleHeight(middleRowRef.current.offsetHeight);
+    } else if (!next && !showAllOverdue) {
+      setLockedMiddleHeight(null);
+    }
+    setShowAllRecent(next);
+  };
+
+  const handleToggleOverdue = () => {
+    const next = !showAllOverdue;
+    if (next && !showAllRecent && middleRowRef.current && window.innerWidth >= 1024) {
+      setLockedMiddleHeight(middleRowRef.current.offsetHeight);
+    } else if (!next && !showAllRecent) {
+      setLockedMiddleHeight(null);
+    }
+    setShowAllOverdue(next);
+  };
 
   const nonArchivedMembers = useMemo(() => {
     return members.filter(m => !isMemberArchived(m));
@@ -248,7 +272,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   return (
-    <div className="p-3.5 lg:px-5 lg:py-3 space-y-3 w-full lg:h-full flex flex-col lg:overflow-hidden">
+    <div className={`p-3.5 lg:px-5 lg:py-3 space-y-3 w-full flex flex-col ${isAnyExpanded ? 'lg:min-h-full' : 'lg:h-full lg:overflow-hidden'}`}>
       {paymentToDelete && (
         <ConfirmPaymentDeleteModal 
             payment={paymentToDelete} 
@@ -321,7 +345,11 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Main Content Grid (Weekly Attendance & Quick Actions) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 lg:flex-1 lg:min-h-0 items-stretch">
+      <div
+        ref={middleRowRef}
+        style={isAnyExpanded && lockedMiddleHeight ? { height: `${lockedMiddleHeight}px` } : undefined}
+        className={`grid grid-cols-1 lg:grid-cols-3 gap-3.5 items-stretch shrink-0 ${isAnyExpanded ? '' : 'lg:flex-1 lg:min-h-0'}`}
+      >
         <div className="lg:col-span-2 bg-surface p-3.5 sm:p-4 pb-2 rounded-xl shadow-lg border border-gray-800/80 flex flex-col lg:min-h-0">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5 shrink-0">
             <div>
@@ -418,82 +446,82 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* Quick Actions Panel - Cleanly Aligned & Non-Overlapping */}
-        <div className="bg-surface p-3.5 sm:p-4 rounded-xl shadow-lg border border-gray-800/80 flex flex-col justify-between">
+        {/* Quick Actions Panel - Tightly Stacked, Taller Buttons Inside Bounds */}
+        <div className="bg-surface p-3 sm:p-3.5 rounded-xl shadow-lg border border-gray-800/80 flex flex-col lg:min-h-0 overflow-hidden">
           <h2 className="text-base font-bold mb-2 text-text-primary tracking-tight flex items-center gap-2 shrink-0">
             <BoltIcon className="h-5 w-5 text-amber-400 shrink-0" />
             <span>Quick Actions</span>
           </h2>
-          <div className="space-y-1.5 flex-1 flex flex-col justify-between">
+          <div className="flex-1 min-h-0 flex flex-col gap-0.5">
             <button 
               onClick={() => onNavigate('members')} 
-              className="w-full bg-[#10b981] hover:bg-[#059669] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#10b981] hover:bg-[#059669] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
-              <span className="w-[158px] flex items-center gap-2.5 text-left">
-                <UserPlusIcon className="h-4 w-4 shrink-0" />
+              <span className="w-[172px] flex items-center gap-2.5 text-left">
+                <UserPlusIcon className="h-[18px] w-[18px] shrink-0" />
                 <span className="whitespace-nowrap">Add Member</span>
               </span>
             </button>
             <button 
               onClick={() => onNavigate('fees')} 
-              className="w-full bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
-              <span className="w-[158px] flex items-center gap-2.5 text-left">
-                <ReceiptIcon className="h-4 w-4 shrink-0" />
+              <span className="w-[172px] flex items-center gap-2.5 text-left">
+                <ReceiptIcon className="h-[18px] w-[18px] shrink-0" />
                 <span className="whitespace-nowrap">Record Payment</span>
               </span>
             </button>
             <button 
               onClick={() => onNavigate('attendance')} 
-              className="w-full bg-[#eab308] hover:bg-[#ca8a04] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#eab308] hover:bg-[#ca8a04] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
-              <span className="w-[158px] flex items-center gap-2.5 text-left">
-                <ClipboardListIcon className="h-4 w-4 shrink-0" />
+              <span className="w-[172px] flex items-center gap-2.5 text-left">
+                <ClipboardListIcon className="h-[18px] w-[18px] shrink-0" />
                 <span className="whitespace-nowrap">Mark Attendance</span>
               </span>
             </button>
             <button 
               onClick={() => onNavigate('dailyledger')} 
-              className="w-full bg-[#f97316] hover:bg-[#ea580c] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#f97316] hover:bg-[#ea580c] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
-              <span className="w-[158px] flex items-center gap-2.5 text-left">
-                <LedgerIcon className="h-4 w-4 shrink-0" />
+              <span className="w-[172px] flex items-center gap-2.5 text-left">
+                <LedgerIcon className="h-[18px] w-[18px] shrink-0" />
                 <span className="whitespace-nowrap">Daily Ledger</span>
               </span>
             </button>
             <button 
               onClick={() => onNavigate('expenses')} 
-              className="w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
-              <span className="w-[158px] flex items-center gap-2.5 text-left">
-                <ExpenseIcon className="h-4 w-4 shrink-0" />
+              <span className="w-[172px] flex items-center gap-2.5 text-left">
+                <ExpenseIcon className="h-[18px] w-[18px] shrink-0" />
                 <span className="whitespace-nowrap">Monthly Expense</span>
               </span>
             </button>
             <button 
               onClick={() => onNavigate('accessories')} 
-              className="w-full bg-[#ec4899] hover:bg-[#db2777] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#ec4899] hover:bg-[#db2777] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
-              <span className="w-[158px] flex items-center gap-2.5 text-left">
-                <AccessoriesIcon className="h-4 w-4 shrink-0" />
+              <span className="w-[172px] flex items-center gap-2.5 text-left">
+                <AccessoriesIcon className="h-[18px] w-[18px] shrink-0" />
                 <span className="whitespace-nowrap">Store Accessories</span>
               </span>
             </button>
             <button 
               onClick={() => onNavigate('staff')} 
-              className="w-full bg-[#14b8a6] hover:bg-[#0d9488] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#14b8a6] hover:bg-[#0d9488] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
-              <span className="w-[158px] flex items-center gap-2.5 text-left">
-                <StaffIcon className="h-4 w-4 shrink-0" />
+              <span className="w-[172px] flex items-center gap-2.5 text-left">
+                <StaffIcon className="h-[18px] w-[18px] shrink-0" />
                 <span className="whitespace-nowrap">Staff & Payroll</span>
               </span>
             </button>
             <button 
               onClick={() => onNavigate('backup')} 
-              className="w-full bg-[#ef4444] hover:bg-[#dc2626] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#ef4444] hover:bg-[#dc2626] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
-              <span className="w-[158px] flex items-center gap-2.5 text-left">
-                <BackupIcon className="h-4 w-4 shrink-0" />
+              <span className="w-[172px] flex items-center gap-2.5 text-left">
+                <BackupIcon className="h-[18px] w-[18px] shrink-0" />
                 <span className="whitespace-nowrap">Backup & Restore</span>
               </span>
             </button>
@@ -502,7 +530,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
       
       {/* Bottom Row (Recent Payments & Overdue Payments) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 shrink-0 items-stretch">
+      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-3.5 shrink-0 ${isAnyExpanded ? 'items-start' : 'items-stretch'}`}>
         {/* Recent Payments Card */}
         <div className="bg-surface p-3.5 sm:p-4 rounded-xl shadow-lg border border-gray-800/80 flex flex-col">
           <div className="flex items-center justify-between gap-3 mb-2.5">
@@ -513,11 +541,11 @@ const Dashboard: React.FC<DashboardProps> = ({
             {sortedPayments.length > 2 ? (
               <button
                 type="button"
-                onClick={() => setShowAllRecent(prev => !prev)}
+                onClick={handleToggleRecent}
                 className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
               >
                 <span>{showAllRecent ? 'Show Less' : `Read More (${sortedPayments.length - 2})`}</span>
-                <span>{showAllRecent ? '↑' : '→'}</span>
+                <span>{showAllRecent ? '↑' : '↓'}</span>
               </button>
             ) : (
               <button
@@ -530,7 +558,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               </button>
             )}
           </div>
-          <div className={`overflow-x-auto flex-1 ${showAllRecent ? 'max-h-[165px] overflow-y-auto pr-1' : ''}`}>
+          <div className="overflow-x-auto flex-1">
             <table className="w-full text-left border-separate border-spacing-0">
               <thead>
                 <tr>
@@ -605,11 +633,11 @@ const Dashboard: React.FC<DashboardProps> = ({
             {overdueMembers.length > 2 ? (
               <button
                 type="button"
-                onClick={() => setShowAllOverdue(prev => !prev)}
+                onClick={handleToggleOverdue}
                 className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
               >
                 <span>{showAllOverdue ? 'Show Less' : `Read More (${overdueMembers.length - 2})`}</span>
-                <span>{showAllOverdue ? '↑' : '→'}</span>
+                <span>{showAllOverdue ? '↑' : '↓'}</span>
               </button>
             ) : (
               <button
@@ -622,7 +650,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               </button>
             )}
           </div>
-          <div className={`overflow-x-auto flex-1 ${showAllOverdue ? 'max-h-[165px] overflow-y-auto pr-1' : ''}`}>
+          <div className="overflow-x-auto flex-1">
             <table className="w-full text-left border-separate border-spacing-0">
               <thead>
                 <tr>

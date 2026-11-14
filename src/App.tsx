@@ -568,7 +568,7 @@ const App: React.FC = () => {
             </div>
             {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 lg:hidden" onClick={() => setIsSidebarOpen(false)}></div>}
             
-            <main className={`flex-1 flex flex-col ${view === 'dashboard' ? 'overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto'}`}>
+            <main className="flex-1 flex flex-col overflow-y-auto">
                 <header className="bg-surface p-4 flex justify-between items-center lg:hidden sticky top-0 z-20 shadow-md">
                     <button onClick={() => setIsSidebarOpen(true)}>
                         <MenuIcon className="h-6 w-6 text-text-primary"/>
