@@ -452,10 +452,10 @@ const Dashboard: React.FC<DashboardProps> = ({
             <BoltIcon className="h-5 w-5 text-amber-400 shrink-0" />
             <span>Quick Actions</span>
           </h2>
-          <div className="flex-1 min-h-0 flex flex-col gap-0.5">
+          <div className="flex-1 min-h-0 flex flex-col gap-1.5">
             <button 
               onClick={() => onNavigate('members')} 
-              className="w-full lg:flex-1 lg:min-h-0 bg-[#10b981] hover:bg-[#059669] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#10b981] hover:bg-[#059669] text-white font-bold py-2.5 lg:py-0 px-4 rounded-full shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
               <span className="w-[172px] flex items-center gap-2.5 text-left">
                 <UserPlusIcon className="h-[18px] w-[18px] shrink-0" />
@@ -464,7 +464,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </button>
             <button 
               onClick={() => onNavigate('fees')} 
-              className="w-full lg:flex-1 lg:min-h-0 bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-2.5 lg:py-0 px-4 rounded-full shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
               <span className="w-[172px] flex items-center gap-2.5 text-left">
                 <ReceiptIcon className="h-[18px] w-[18px] shrink-0" />
@@ -473,7 +473,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </button>
             <button 
               onClick={() => onNavigate('attendance')} 
-              className="w-full lg:flex-1 lg:min-h-0 bg-[#eab308] hover:bg-[#ca8a04] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#eab308] hover:bg-[#ca8a04] text-white font-bold py-2.5 lg:py-0 px-4 rounded-full shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
               <span className="w-[172px] flex items-center gap-2.5 text-left">
                 <ClipboardListIcon className="h-[18px] w-[18px] shrink-0" />
@@ -482,7 +482,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </button>
             <button 
               onClick={() => onNavigate('dailyledger')} 
-              className="w-full lg:flex-1 lg:min-h-0 bg-[#f97316] hover:bg-[#ea580c] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#f97316] hover:bg-[#ea580c] text-white font-bold py-2.5 lg:py-0 px-4 rounded-full shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
               <span className="w-[172px] flex items-center gap-2.5 text-left">
                 <LedgerIcon className="h-[18px] w-[18px] shrink-0" />
@@ -491,7 +491,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </button>
             <button 
               onClick={() => onNavigate('expenses')} 
-              className="w-full lg:flex-1 lg:min-h-0 bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-2.5 lg:py-0 px-4 rounded-full shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
               <span className="w-[172px] flex items-center gap-2.5 text-left">
                 <ExpenseIcon className="h-[18px] w-[18px] shrink-0" />
@@ -500,7 +500,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </button>
             <button 
               onClick={() => onNavigate('accessories')} 
-              className="w-full lg:flex-1 lg:min-h-0 bg-[#ec4899] hover:bg-[#db2777] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#ec4899] hover:bg-[#db2777] text-white font-bold py-2.5 lg:py-0 px-4 rounded-full shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
               <span className="w-[172px] flex items-center gap-2.5 text-left">
                 <AccessoriesIcon className="h-[18px] w-[18px] shrink-0" />
@@ -509,7 +509,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </button>
             <button 
               onClick={() => onNavigate('staff')} 
-              className="w-full lg:flex-1 lg:min-h-0 bg-[#14b8a6] hover:bg-[#0d9488] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#14b8a6] hover:bg-[#0d9488] text-white font-bold py-2.5 lg:py-0 px-4 rounded-full shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
               <span className="w-[172px] flex items-center gap-2.5 text-left">
                 <StaffIcon className="h-[18px] w-[18px] shrink-0" />
@@ -518,7 +518,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </button>
             <button 
               onClick={() => onNavigate('backup')} 
-              className="w-full lg:flex-1 lg:min-h-0 bg-[#ef4444] hover:bg-[#dc2626] text-white font-bold py-2.5 lg:py-0 px-4 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
+              className="w-full lg:flex-1 lg:min-h-0 bg-[#ef4444] hover:bg-[#dc2626] text-white font-bold py-2.5 lg:py-0 px-4 rounded-full shadow-sm hover:shadow-md transition-all flex items-center justify-center text-sm cursor-pointer"
             >
               <span className="w-[172px] flex items-center gap-2.5 text-left">
                 <BackupIcon className="h-[18px] w-[18px] shrink-0" />
