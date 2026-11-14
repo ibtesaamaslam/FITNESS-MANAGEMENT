@@ -538,25 +538,20 @@ const Dashboard: React.FC<DashboardProps> = ({
               <WalletFilledIcon className="h-5 w-5 text-blue-500 shrink-0" />
               <span>Recent Payments</span>
             </h2>
-            {sortedPayments.length > 2 ? (
-              <button
-                type="button"
-                onClick={handleToggleRecent}
-                className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
-              >
-                <span>{showAllRecent ? 'Show Less' : `Read More (${sortedPayments.length - 2})`}</span>
-                <span>{showAllRecent ? '↑' : '↓'}</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onNavigate('fees')}
-                className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
-              >
-                <span>View All</span>
-                <span>→</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleToggleRecent}
+              className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <span>
+                {showAllRecent
+                  ? 'Show Less'
+                  : sortedPayments.length > 2
+                    ? `Read More (${sortedPayments.length - 2})`
+                    : 'View All'}
+              </span>
+              <span>{showAllRecent ? '↑' : '↓'}</span>
+            </button>
           </div>
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-left border-separate border-spacing-0">
@@ -630,25 +625,20 @@ const Dashboard: React.FC<DashboardProps> = ({
               <ClockIcon className="h-5 w-5 text-blue-400 shrink-0" />
               <span>Overdue Payments</span>
             </h2>
-            {overdueMembers.length > 2 ? (
-              <button
-                type="button"
-                onClick={handleToggleOverdue}
-                className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
-              >
-                <span>{showAllOverdue ? 'Show Less' : `Read More (${overdueMembers.length - 2})`}</span>
-                <span>{showAllOverdue ? '↑' : '↓'}</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onNavigate('fees')}
-                className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
-              >
-                <span>View All</span>
-                <span>→</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleToggleOverdue}
+              className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <span>
+                {showAllOverdue
+                  ? 'Show Less'
+                  : overdueMembers.length > 2
+                    ? `Read More (${overdueMembers.length - 2})`
+                    : 'View All'}
+              </span>
+              <span>{showAllOverdue ? '↑' : '↓'}</span>
+            </button>
           </div>
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-left border-separate border-spacing-0">
