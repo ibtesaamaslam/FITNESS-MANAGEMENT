@@ -6,16 +6,20 @@ import {
   CloseIcon, 
   LedgerIcon, 
   ExpenseIcon, 
-  UsersIcon, 
   UserCheckIcon, 
-  CashIcon, 
-  ClipboardCheckIcon, 
   UserPlusIcon, 
   ReceiptIcon, 
   ClipboardListIcon,
   AccessoriesIcon,
   StaffIcon,
-  BackupIcon
+  BackupIcon,
+  UsersGroupFilledIcon,
+  WalletOutlineIcon,
+  WalletFilledIcon,
+  CalendarGridIcon,
+  TrendingChartIcon,
+  BoltIcon,
+  ClockIcon
 } from './icons';
 import { getLocalDateString, getLocalMonthString, isMemberArchived, formatDateDDMMYYYY } from '../lib/dateUtils';
 import { MaskedAmount } from './MaskedAmount';
@@ -38,17 +42,33 @@ const StatCard: React.FC<{
   value: React.ReactNode; 
   subValue?: React.ReactNode;
   icon: React.ReactNode;
+  watermarkIcon?: React.ReactNode;
   iconBgColor?: string;
   iconColor?: string;
-}> = ({ title, value, subValue, icon, iconBgColor = "bg-teal-500/15 border-teal-500/30", iconColor = "text-teal-400" }) => (
-  <div className="bg-surface p-5 rounded-xl shadow-lg border border-gray-800/80 flex items-center space-x-4">
-    <div className={`p-3 rounded-full border ${iconBgColor} ${iconColor} shrink-0 flex items-center justify-center`}>
+  watermarkColor?: string;
+}> = ({
+  title,
+  value,
+  subValue,
+  icon,
+  watermarkIcon,
+  iconBgColor = "bg-teal-500/15 border-teal-500/30",
+  iconColor = "text-teal-400",
+  watermarkColor = "text-emerald-300"
+}) => (
+  <div className="bg-surface px-4 py-3 rounded-xl shadow-lg border border-gray-800/80 flex items-center space-x-3.5 relative overflow-hidden">
+    {watermarkIcon && (
+      <div className={`absolute right-2.5 bottom-1 opacity-[0.06] pointer-events-none select-none ${watermarkColor}`}>
+        {watermarkIcon}
+      </div>
+    )}
+    <div className={`w-11 h-11 rounded-full border ${iconBgColor} ${iconColor} shrink-0 flex items-center justify-center relative z-10`}>
       {icon}
     </div>
-    <div className="overflow-hidden min-w-0 flex-1">
-      <p className="text-xs font-medium text-text-secondary mb-1">{title}</p>
-      <div className="text-2xl font-bold text-text-primary tracking-tight">{value}</div>
-      {subValue && <div className="mt-1">{subValue}</div>}
+    <div className="overflow-hidden min-w-0 flex-1 relative z-10">
+      <p className="text-xs font-medium text-text-secondary mb-0.5">{title}</p>
+      <div className="text-xl lg:text-2xl font-bold text-text-primary tracking-tight leading-tight">{value}</div>
+      {subValue && <div className="mt-0.5">{subValue}</div>}
     </div>
   </div>
 );
@@ -83,8 +103,19 @@ const ConfirmPaymentDeleteModal: React.FC<{
     );
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales = [], role = 'Admin', onNavigate, onDeletePayment, isUnlocked = false, onUnlockRequest }) => {
+const Dashboard: React.FC<DashboardProps> = ({
+  members,
+  payments,
+  accessorySales = [],
+  role = 'Admin',
+  onNavigate,
+  onDeletePayment,
+  isUnlocked = false,
+  onUnlockRequest
+}) => {
   const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
+  const [showAllRecent, setShowAllRecent] = useState(false);
+  const [showAllOverdue, setShowAllOverdue] = useState(false);
 
   const nonArchivedMembers = useMemo(() => {
     return members.filter(m => !isMemberArchived(m));
@@ -188,7 +219,13 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
     return Math.round(sum / 7);
   }, [attendanceData]);
 
-  const recentPayments = [...payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+  const sortedPayments = useMemo(() => {
+    return [...payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [payments]);
+
+  const displayedRecentPayments = useMemo(() => {
+    return showAllRecent ? sortedPayments : sortedPayments.slice(0, 2);
+  }, [sortedPayments, showAllRecent]);
 
   const overdueMembers = useMemo(() => {
     return nonArchivedMembers.filter(m => {
@@ -199,6 +236,10 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
     });
   }, [nonArchivedMembers, currentMonth, todayStr]);
 
+  const displayedOverdueMembers = useMemo(() => {
+    return showAllOverdue ? overdueMembers : overdueMembers.slice(0, 2);
+  }, [overdueMembers, showAllOverdue]);
+
   const confirmDeletePayment = () => {
     if(paymentToDelete) {
         onDeletePayment(paymentToDelete.id);
@@ -207,7 +248,7 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-6 w-full">
+    <div className="p-3.5 lg:px-5 lg:py-3 space-y-3 w-full lg:h-full flex flex-col lg:overflow-hidden">
       {paymentToDelete && (
         <ConfirmPaymentDeleteModal 
             payment={paymentToDelete} 
@@ -217,33 +258,35 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
       )}
 
       {/* 4 Stat Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 shrink-0">
         <StatCard 
           title="Total Members" 
           value={totalMembers} 
           subValue={
-            <div className="flex items-center gap-2 text-[11px] font-semibold">
+            <div className="flex items-center gap-3 text-[11px] font-semibold">
               <span className="text-blue-400">♂ {maleMembers} Male</span>
-              <span className="text-gray-600">·</span>
               <span className="text-pink-400">♀ {femaleMembers} Female</span>
             </div>
           }
-          icon={<UsersIcon className="h-5 w-5" />} 
-          iconBgColor="bg-teal-500/15 border-teal-500/30"
-          iconColor="text-teal-400"
+          icon={<UsersGroupFilledIcon className="h-5 w-5" />} 
+          watermarkIcon={<UsersGroupFilledIcon className="h-16 w-16" />}
+          watermarkColor="text-emerald-300"
+          iconBgColor="bg-emerald-500/15 border-emerald-400/40 shadow-[0_0_20px_rgba(16,185,129,0.35)]"
+          iconColor="text-emerald-400"
         />
         <StatCard 
           title="Active Members" 
           value={activeMembers} 
           subValue={
-            <div className="flex items-center gap-2 text-[11px] font-semibold">
+            <div className="flex items-center gap-3 text-[11px] font-semibold">
               <span className="text-blue-400">♂ {activeMale} Male</span>
-              <span className="text-gray-600">·</span>
               <span className="text-pink-400">♀ {activeFemale} Female</span>
             </div>
           }
           icon={<UserCheckIcon className="h-5 w-5" />} 
-          iconBgColor="bg-emerald-500/15 border-emerald-500/30"
+          watermarkIcon={<UsersGroupFilledIcon className="h-16 w-16" />}
+          watermarkColor="text-emerald-300"
+          iconBgColor="bg-emerald-500/15 border-emerald-400/40 shadow-[0_0_20px_rgba(16,185,129,0.35)]"
           iconColor="text-emerald-400"
         />
         <StatCard
@@ -254,52 +297,55 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
               Fees + Store Sales
             </div>
           }
-          icon={<CashIcon className="h-5 w-5" />} 
-          iconBgColor="bg-blue-500/15 border-blue-500/30"
+          icon={<WalletOutlineIcon className="h-5 w-5" />} 
+          watermarkIcon={<TrendingChartIcon className="h-16 w-16" />}
+          watermarkColor="text-blue-400"
+          iconBgColor="bg-blue-500/15 border-blue-500/45 shadow-[0_0_20px_rgba(59,130,246,0.38)]"
           iconColor="text-blue-400"
         />
         <StatCard 
           title="Present Today" 
           value={todaysAttendance} 
           subValue={
-            <div className="flex items-center gap-2 text-[11px] font-semibold">
+            <div className="flex items-center gap-3 text-[11px] font-semibold">
               <span className="text-blue-400">♂ {todayMaleAttendance} Male</span>
-              <span className="text-gray-600">·</span>
               <span className="text-pink-400">♀ {todayFemaleAttendance} Female</span>
             </div>
           }
-          icon={<ClipboardCheckIcon className="h-5 w-5" />} 
-          iconBgColor="bg-amber-500/15 border-amber-500/30"
+          icon={<CalendarGridIcon className="h-5 w-5" />} 
+          watermarkIcon={<CalendarGridIcon className="h-16 w-16" />}
+          watermarkColor="text-amber-300"
+          iconBgColor="bg-amber-500/15 border-amber-400/45 shadow-[0_0_20px_rgba(245,158,11,0.35)]"
           iconColor="text-amber-400"
         />
       </div>
 
       {/* Main Content Grid (Weekly Attendance & Quick Actions) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-surface p-5 sm:p-6 pb-3 sm:pb-4 rounded-xl shadow-lg border border-gray-800/80 flex flex-col">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 lg:flex-1 lg:min-h-0 items-stretch">
+        <div className="lg:col-span-2 bg-surface p-3.5 sm:p-4 pb-2 rounded-xl shadow-lg border border-gray-800/80 flex flex-col lg:min-h-0">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5 shrink-0">
             <div>
-              <h2 className="text-base font-bold text-text-primary tracking-tight">
-                Weekly Attendance Trend
+              <h2 className="text-base font-bold text-text-primary tracking-tight flex items-center gap-2">
+                <TrendingChartIcon className="h-5 w-5 text-sky-400 shrink-0" />
+                <span>Weekly Attendance Trend</span>
               </h2>
               <p className="text-xs text-text-secondary mt-0.5">Daily check-in activity for the past 7 days</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2.5 text-xs">
-              <span className="flex items-center gap-1.5 font-semibold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20">
-                <span className="w-2 h-2 rounded-full bg-blue-400 inline-block"></span>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="flex items-center gap-1.5 font-semibold text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/35">
                 <span>♂ Male</span>
               </span>
-              <span className="flex items-center gap-1.5 font-semibold text-pink-400 bg-pink-500/10 px-2.5 py-1 rounded-lg border border-pink-500/20">
-                <span className="w-2 h-2 rounded-full bg-pink-400 inline-block"></span>
+              <span className="flex items-center gap-1.5 font-semibold text-pink-400 bg-pink-500/10 px-3 py-1 rounded-full border border-pink-500/35">
                 <span>♀ Female</span>
               </span>
-              <span className="font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-                Avg: {weeklyAverage}/day
+              <span className="flex items-center gap-1.5 font-semibold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/35">
+                <TrendingChartIcon className="h-3.5 w-3.5" />
+                <span>Avg: {weeklyAverage}/day</span>
               </span>
             </div>
           </div>
 
-          <div className="flex-1 w-full min-h-[300px] h-[360px]">
+          <div className="flex-1 w-full min-h-[240px] lg:min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart 
                 data={attendanceData} 
@@ -372,93 +418,136 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
           </div>
         </div>
 
-        {/* Quick Actions Panel - Larger, High-Visibility Buttons */}
-        <div className="bg-surface p-5 sm:p-6 rounded-xl shadow-lg border border-gray-800/80 flex flex-col justify-between">
-          <h2 className="text-base font-bold mb-3 text-text-primary tracking-tight">Quick Actions</h2>
-          <div className="space-y-2.5 my-auto">
+        {/* Quick Actions Panel - Cleanly Aligned & Non-Overlapping */}
+        <div className="bg-surface p-3.5 sm:p-4 rounded-xl shadow-lg border border-gray-800/80 flex flex-col justify-between">
+          <h2 className="text-base font-bold mb-2 text-text-primary tracking-tight flex items-center gap-2 shrink-0">
+            <BoltIcon className="h-5 w-5 text-amber-400 shrink-0" />
+            <span>Quick Actions</span>
+          </h2>
+          <div className="space-y-1.5 flex-1 flex flex-col justify-between">
             <button 
               onClick={() => onNavigate('members')} 
-              className="w-full bg-[#10b981] hover:bg-[#059669] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
+              className="w-full bg-[#10b981] hover:bg-[#059669] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
             >
-              <UserPlusIcon className="h-4.5 w-4.5" />
-              <span>Add Member</span>
+              <span className="w-[158px] flex items-center gap-2.5 text-left">
+                <UserPlusIcon className="h-4 w-4 shrink-0" />
+                <span className="whitespace-nowrap">Add Member</span>
+              </span>
             </button>
             <button 
               onClick={() => onNavigate('fees')} 
-              className="w-full bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
+              className="w-full bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
             >
-              <ReceiptIcon className="h-4.5 w-4.5" />
-              <span>Record Payment</span>
+              <span className="w-[158px] flex items-center gap-2.5 text-left">
+                <ReceiptIcon className="h-4 w-4 shrink-0" />
+                <span className="whitespace-nowrap">Record Payment</span>
+              </span>
             </button>
             <button 
               onClick={() => onNavigate('attendance')} 
-              className="w-full bg-[#eab308] hover:bg-[#ca8a04] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
+              className="w-full bg-[#eab308] hover:bg-[#ca8a04] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
             >
-              <ClipboardListIcon className="h-4.5 w-4.5" />
-              <span>Mark Attendance</span>
+              <span className="w-[158px] flex items-center gap-2.5 text-left">
+                <ClipboardListIcon className="h-4 w-4 shrink-0" />
+                <span className="whitespace-nowrap">Mark Attendance</span>
+              </span>
             </button>
             <button 
               onClick={() => onNavigate('dailyledger')} 
-              className="w-full bg-[#f97316] hover:bg-[#ea580c] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
+              className="w-full bg-[#f97316] hover:bg-[#ea580c] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
             >
-              <LedgerIcon className="h-4.5 w-4.5" />
-              <span>Daily Ledger</span>
+              <span className="w-[158px] flex items-center gap-2.5 text-left">
+                <LedgerIcon className="h-4 w-4 shrink-0" />
+                <span className="whitespace-nowrap">Daily Ledger</span>
+              </span>
             </button>
             <button 
               onClick={() => onNavigate('expenses')} 
-              className="w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
+              className="w-full bg-[#a855f7] hover:bg-[#9333ea] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
             >
-              <ExpenseIcon className="h-4.5 w-4.5" />
-              <span>Monthly Expense</span>
+              <span className="w-[158px] flex items-center gap-2.5 text-left">
+                <ExpenseIcon className="h-4 w-4 shrink-0" />
+                <span className="whitespace-nowrap">Monthly Expense</span>
+              </span>
             </button>
             <button 
               onClick={() => onNavigate('accessories')} 
-              className="w-full bg-[#ec4899] hover:bg-[#db2777] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
+              className="w-full bg-[#ec4899] hover:bg-[#db2777] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
             >
-              <AccessoriesIcon className="h-4.5 w-4.5" />
-              <span>Store Accessories</span>
+              <span className="w-[158px] flex items-center gap-2.5 text-left">
+                <AccessoriesIcon className="h-4 w-4 shrink-0" />
+                <span className="whitespace-nowrap">Store Accessories</span>
+              </span>
             </button>
             <button 
               onClick={() => onNavigate('staff')} 
-              className="w-full bg-[#14b8a6] hover:bg-[#0d9488] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
+              className="w-full bg-[#14b8a6] hover:bg-[#0d9488] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
             >
-              <StaffIcon className="h-4.5 w-4.5" />
-              <span>Staff & Payroll</span>
+              <span className="w-[158px] flex items-center gap-2.5 text-left">
+                <StaffIcon className="h-4 w-4 shrink-0" />
+                <span className="whitespace-nowrap">Staff & Payroll</span>
+              </span>
             </button>
             <button 
               onClick={() => onNavigate('backup')} 
-              className="w-full bg-[#ef4444] hover:bg-[#dc2626] text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2.5 text-sm cursor-pointer"
+              className="w-full bg-[#ef4444] hover:bg-[#dc2626] text-white font-bold py-1.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center text-[13px] cursor-pointer"
             >
-              <BackupIcon className="h-4.5 w-4.5" />
-              <span>Backup & Restore</span>
+              <span className="w-[158px] flex items-center gap-2.5 text-left">
+                <BackupIcon className="h-4 w-4 shrink-0" />
+                <span className="whitespace-nowrap">Backup & Restore</span>
+              </span>
             </button>
           </div>
         </div>
       </div>
       
       {/* Bottom Row (Recent Payments & Overdue Payments) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 shrink-0 items-stretch">
         {/* Recent Payments Card */}
-        <div className="bg-surface p-6 rounded-xl shadow-lg border border-gray-800/80">
-          <h2 className="text-base font-bold mb-4 text-text-primary tracking-tight">Recent Payments</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+        <div className="bg-surface p-3.5 sm:p-4 rounded-xl shadow-lg border border-gray-800/80 flex flex-col">
+          <div className="flex items-center justify-between gap-3 mb-2.5">
+            <h2 className="text-base font-bold text-text-primary tracking-tight flex items-center gap-2">
+              <WalletFilledIcon className="h-5 w-5 text-blue-500 shrink-0" />
+              <span>Recent Payments</span>
+            </h2>
+            {sortedPayments.length > 2 ? (
+              <button
+                type="button"
+                onClick={() => setShowAllRecent(prev => !prev)}
+                className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
+              >
+                <span>{showAllRecent ? 'Show Less' : `Read More (${sortedPayments.length - 2})`}</span>
+                <span>{showAllRecent ? '↑' : '→'}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onNavigate('fees')}
+                className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
+              >
+                <span>View All</span>
+                <span>→</span>
+              </button>
+            )}
+          </div>
+          <div className={`overflow-x-auto flex-1 ${showAllRecent ? 'max-h-[165px] overflow-y-auto pr-1' : ''}`}>
+            <table className="w-full text-left border-separate border-spacing-0">
               <thead>
-                <tr className="border-b border-gray-700/80 text-text-primary font-bold text-sm">
-                  <th className="p-3 text-text-primary font-bold">Member</th>
-                  <th className="p-3 text-text-primary font-bold">Date</th>
-                  <th className="p-3 text-text-primary font-bold">Amount</th>
-                  <th className="p-3 text-text-primary font-bold">Method</th>
-                  <th className="p-3 text-right text-text-primary font-bold">Actions</th>
+                <tr>
+                  <th className="py-2 px-3 bg-secondary/50 border-y border-l border-gray-800/70 rounded-l-lg text-text-primary font-bold text-xs">Member</th>
+                  <th className="py-2 px-3 bg-secondary/50 border-y border-gray-800/70 text-text-primary font-bold text-xs">Date</th>
+                  <th className="py-2 px-3 bg-secondary/50 border-y border-gray-800/70 text-text-primary font-bold text-xs">Amount</th>
+                  <th className="py-2 px-3 bg-secondary/50 border-y border-gray-800/70 text-text-primary font-bold text-xs">Method</th>
+                  <th className="py-2 px-3 bg-secondary/50 border-y border-r border-gray-800/70 rounded-r-lg text-right text-text-primary font-bold text-xs">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/50 text-sm">
-                {recentPayments.length > 0 ? (
-                  recentPayments.map(p => {
+                {displayedRecentPayments.length > 0 ? (
+                  displayedRecentPayments.map(p => {
                     const member = nonArchivedMembers.find(m => m.id === p.memberId);
                     return (
-                    <tr key={p.id} className="hover:bg-secondary/60 transition-colors">
-                      <td className="p-3 font-semibold text-text-primary">
+                    <tr key={p.id} className="hover:bg-secondary/60 transition-colors border-b border-gray-800/40">
+                      <td className="py-2 px-3 font-semibold text-text-primary">
                         <div className="flex items-center space-x-2">
                           <span className="flex items-center gap-1.5">
                             <span>{p.memberName}</span>
@@ -467,20 +556,20 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
                           {member && <GenderBadge gender={member.gender || 'Male'} size="sm" />}
                         </div>
                       </td>
-                      <td className="p-3 text-text-secondary font-mono">{formatDateDDMMYYYY(p.date)}</td>
-                      <td className="p-3 text-emerald-500 dark:text-emerald-400 font-bold">
+                      <td className="py-2 px-3 text-text-secondary font-mono text-xs">{formatDateDDMMYYYY(p.date)}</td>
+                      <td className="py-2 px-3 text-emerald-500 dark:text-emerald-400 font-bold text-sm">
                         <MaskedAmount amount={p.amount} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
                       </td>
-                      <td className="p-3">
-                        <span className="bg-secondary text-text-secondary border border-gray-700/50 px-2.5 py-1 rounded-md text-xs font-semibold">
+                      <td className="py-2 px-3">
+                        <span className="bg-secondary text-text-secondary border border-gray-700/50 px-2 py-0.5 rounded-md text-xs font-semibold">
                           {p.method}
                         </span>
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="py-2 px-3 text-right">
                         {role === 'Admin' ? (
                           <button 
                             onClick={() => setPaymentToDelete(p)}
-                            className="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                            className="text-red-400 hover:text-red-300 p-1 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
                             title="Delete payment entry"
                           >
                             <TrashIcon className="h-4 w-4" />
@@ -495,8 +584,9 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
                   );})
                 ) : (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-text-secondary text-sm">
-                      No payments recorded yet.
+                    <td colSpan={5} className="py-7 text-center text-text-secondary text-xs">
+                      <WalletOutlineIcon className="h-7 w-7 mx-auto mb-1.5 text-gray-500/70" />
+                      <span>No payments recorded yet.</span>
                     </td>
                   </tr>
                 )}
@@ -506,46 +596,71 @@ const Dashboard: React.FC<DashboardProps> = ({ members, payments, accessorySales
         </div>
 
         {/* Overdue Payments Card */}
-        <div className="bg-surface p-6 rounded-xl shadow-lg border border-gray-800/80">
-          <h2 className="text-base font-bold mb-4 text-text-primary tracking-tight">Overdue Payments</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+        <div className="bg-surface p-3.5 sm:p-4 rounded-xl shadow-lg border border-gray-800/80 flex flex-col">
+          <div className="flex items-center justify-between gap-3 mb-2.5">
+            <h2 className="text-base font-bold text-text-primary tracking-tight flex items-center gap-2">
+              <ClockIcon className="h-5 w-5 text-blue-400 shrink-0" />
+              <span>Overdue Payments</span>
+            </h2>
+            {overdueMembers.length > 2 ? (
+              <button
+                type="button"
+                onClick={() => setShowAllOverdue(prev => !prev)}
+                className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
+              >
+                <span>{showAllOverdue ? 'Show Less' : `Read More (${overdueMembers.length - 2})`}</span>
+                <span>{showAllOverdue ? '↑' : '→'}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onNavigate('fees')}
+                className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
+              >
+                <span>View All</span>
+                <span>→</span>
+              </button>
+            )}
+          </div>
+          <div className={`overflow-x-auto flex-1 ${showAllOverdue ? 'max-h-[165px] overflow-y-auto pr-1' : ''}`}>
+            <table className="w-full text-left border-separate border-spacing-0">
               <thead>
-                <tr className="border-b border-gray-700/80 text-text-primary font-bold text-sm">
-                  <th className="p-3 text-text-primary font-bold">Member</th>
-                  <th className="p-3 text-text-primary font-bold">Due Date</th>
-                  <th className="p-3 text-text-primary font-bold">Fee</th>
-                  <th className="p-3 text-right text-text-primary font-bold">Action</th>
+                <tr>
+                  <th className="py-2 px-3 bg-secondary/50 border-y border-l border-gray-800/70 rounded-l-lg text-text-primary font-bold text-xs">Member</th>
+                  <th className="py-2 px-3 bg-secondary/50 border-y border-gray-800/70 text-text-primary font-bold text-xs">Due Date</th>
+                  <th className="py-2 px-3 bg-secondary/50 border-y border-gray-800/70 text-text-primary font-bold text-xs">Fee</th>
+                  <th className="py-2 px-3 bg-secondary/50 border-y border-r border-gray-800/70 rounded-r-lg text-right text-text-primary font-bold text-xs">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/50 text-sm">
-                {overdueMembers.length > 0 ? (
-                  overdueMembers.map(m => (
-                    <tr key={m.id} className="hover:bg-secondary/60 transition-colors">
-                      <td className="p-3 font-semibold text-text-primary">
+                {displayedOverdueMembers.length > 0 ? (
+                  displayedOverdueMembers.map(m => (
+                    <tr key={m.id} className="hover:bg-secondary/60 transition-colors border-b border-gray-800/40">
+                      <td className="py-2 px-3 font-semibold text-text-primary">
                         <div className="flex items-center space-x-2">
                           <span>{m.name}</span>
                           <GenderBadge gender={m.gender || 'Male'} size="sm" />
                         </div>
                       </td>
-                      <td className="p-3 text-red-500 dark:text-red-400 font-mono text-xs font-bold">{formatDateDDMMYYYY(m.expiryDate)}</td>
-                      <td className="p-3 text-text-primary font-semibold">
+                      <td className="py-2 px-3 text-red-500 dark:text-red-400 font-mono text-xs font-bold">{formatDateDDMMYYYY(m.expiryDate)}</td>
+                      <td className="py-2 px-3 text-text-primary font-semibold text-sm">
                         <MaskedAmount amount={m.fee} isUnlocked={isUnlocked} onUnlockRequest={onUnlockRequest} />
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="py-2 px-3 text-right">
                         <button 
                           onClick={() => onNavigate('fees')}
-                          className="bg-primary hover:bg-primary-hover text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer"
+                          className="bg-[#ef4444] hover:bg-[#dc2626] text-white px-3.5 py-1 rounded-md text-xs font-bold transition-all shadow-md cursor-pointer"
                         >
-                          Clear Fee
+                          Pay
                         </button>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="py-12 text-center text-emerald-500 dark:text-emerald-400 text-sm font-semibold">
-                      ✓ All active members are paid for this month!
+                    <td colSpan={4} className="py-7 text-center text-emerald-500 dark:text-emerald-400 text-xs font-semibold">
+                      <CalendarGridIcon className="h-7 w-7 mx-auto mb-1.5 text-gray-500/70" />
+                      <span>✓ All active members are paid for this month!</span>
                     </td>
                   </tr>
                 )}

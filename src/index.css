@@ -3,9 +3,9 @@
 @theme {
   --color-primary: #10B981;
   --color-primary-hover: #059669;
-  --color-secondary: #252e3e;
-  --color-background: #0f172a;
-  --color-surface: #1e293b;
+  --color-secondary: #162235;
+  --color-background: #070d19;
+  --color-surface: #0d1626;
   --color-text-primary: #FFFFFF;
   --color-text-secondary: #9CA3AF;
 }
@@ -13,9 +13,9 @@
 :root {
   --color-primary: #10B981;
   --color-primary-hover: #059669;
-  --color-secondary: #252e3e;
-  --color-background: #0f172a;
-  --color-surface: #1e293b;
+  --color-secondary: #162235;
+  --color-background: #070d19;
+  --color-surface: #0d1626;
   --color-text-primary: #FFFFFF;
   --color-text-secondary: #9CA3AF;
   color-scheme: dark;
@@ -26,7 +26,7 @@ html, body {
   padding: 0;
   width: 100%;
   height: 100%;
-  background-color: #0f172a;
+  background-color: #070d19;
   overflow: hidden;
 }
 

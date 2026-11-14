@@ -8,7 +8,10 @@ export const DashboardIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export const MembersIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 12a4 4 0 110-8 4 4 0 010 8z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+    <circle cx="9" cy="7" r="4" strokeWidth={2} />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M23 21v-2a4 4 0 00-3-3.87" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 3.13a4 4 0 010 7.75" />
   </svg>
 );
 
@@ -80,7 +83,8 @@ export const LedgerIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export const ExpenseIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.407 2.621 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.407-2.621-1M12 16c1.657 0 3-.895 3-2s-1.343-2-3-2-3-.895-3-2 1.343-2 3-2m0 8V7m0 1v8" />
+    <circle cx="12" cy="12" r="9" strokeWidth={2} />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.407 2.621 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.407-2.621-1" />
   </svg>
 );
 
@@ -225,6 +229,66 @@ export const RefreshIcon = (props: React.SVGProps<SVGSVGElement>) => (
 export const ShieldCheckIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+  </svg>
+);
+
+export const DumbbellLogoIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 24" fill="currentColor" {...props}>
+    <rect x="2" y="7" width="3" height="10" rx="1.5" />
+    <rect x="6.5" y="3.5" width="3.8" height="17" rx="1.8" />
+    <rect x="10.3" y="10.4" width="11.4" height="3.2" rx="1" />
+    <rect x="21.7" y="3.5" width="3.8" height="17" rx="1.8" />
+    <rect x="27" y="7" width="3" height="10" rx="1.5" />
+  </svg>
+);
+
+export const UsersGroupFilledIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M9 11a4 4 0 100-8 4 4 0 000 8zm0 2c-3.866 0-7 2.015-7 4.5V19a1 1 0 001 1h12a1 1 0 001-1v-1.5c0-2.485-3.134-4.5-7-4.5z" />
+    <path d="M16.5 11a3 3 0 100-6 3 3 0 000 6zm.5 2c-.78 0-1.522.137-2.194.38A5.48 5.48 0 0117.5 18v2H21a1 1 0 001-1v-1.5c0-2.485-2.239-4.5-5-4.5z" opacity="0.85" />
+  </svg>
+);
+
+export const WalletOutlineIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h12a2 2 0 012 2v1H5a2 2 0 00-2 2v7a2 2 0 002 2h12a2 2 0 002-2v-1" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 7h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11h5v4h-5a2 2 0 010-4z" />
+    <circle cx="17.5" cy="13" r="0.8" fill="currentColor" />
+  </svg>
+);
+
+export const WalletFilledIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M4 5.5A2.5 2.5 0 016.5 3h11A2.5 2.5 0 0120 5.5V7H6.5A1.5 1.5 0 005 8.5v.17A2.99 2.99 0 016.5 8h12A2.5 2.5 0 0121 10.5v1h-4.5a2.5 2.5 0 000 5H21v1a2.5 2.5 0 01-2.5 2.5h-12A2.5 2.5 0 014 17.5v-12z" />
+    <path d="M16.5 13a1.5 1.5 0 000 3H21.5a.5.5 0 00.5-.5v-2a.5.5 0 00-.5-.5h-5z" />
+  </svg>
+);
+
+export const CalendarGridIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3v3m8-3v3M4 9h16M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z" />
+    <rect x="7" y="12" width="2" height="2" rx="0.4" fill="currentColor" stroke="none" />
+    <rect x="11" y="12" width="2" height="2" rx="0.4" fill="currentColor" stroke="none" />
+    <rect x="15" y="12" width="2" height="2" rx="0.4" fill="currentColor" stroke="none" />
+    <rect x="7" y="16" width="2" height="2" rx="0.4" fill="currentColor" stroke="none" />
+    <rect x="11" y="16" width="2" height="2" rx="0.4" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+export const TrendingChartIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 19h16" />
+    <rect x="5" y="13" width="3" height="6" rx="0.8" fill="currentColor" stroke="none" />
+    <rect x="10.5" y="10" width="3" height="9" rx="0.8" fill="currentColor" stroke="none" />
+    <rect x="16" y="7" width="3" height="12" rx="0.8" fill="currentColor" stroke="none" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 10l5-4 4 2 6-5m0 0h-3.5m3.5 0v3.5" />
+  </svg>
+);
+
+export const BoltIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path fillRule="evenodd" d="M14.615 1.595a.75.75 0 01.359.852L12.982 9.75h7.268a.75.75 0 01.548 1.262l-10.5 11.25a.75.75 0 01-1.272-.71l1.992-7.302H3.75a.75.75 0 01-.548-1.262l10.5-11.25a.75.75 0 01.913-.143z" clipRule="evenodd" />
   </svg>
 );
 

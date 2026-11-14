@@ -19,7 +19,7 @@ import { useFinancialPrivacy } from './hooks/useFinancialPrivacy';
 import { FinancialSecurityModal } from './components/FinancialSecurityModal';
 import { getLocalDateString, getLocalMonthString, isMemberArchived } from './lib/dateUtils';
 import { NotificationMessageBox } from './components/NotificationMessageBox';
-import { DashboardIcon, MembersIcon, FeesIcon, AttendanceIcon, DocumentReportIcon, MenuIcon, CloseIcon, LogOutIcon, LedgerIcon, ExpenseIcon, LockIcon, ArchiveIcon, AccessoriesIcon, StaffIcon, BackupIcon } from './components/icons';
+import { DashboardIcon, MembersIcon, FeesIcon, AttendanceIcon, DocumentReportIcon, MenuIcon, CloseIcon, LogOutIcon, LedgerIcon, ExpenseIcon, LockIcon, ArchiveIcon, AccessoriesIcon, StaffIcon, BackupIcon, DumbbellLogoIcon } from './components/icons';
 import { DB_CONFIG } from './lib/dbConfig';
 
 const NavLink: React.FC<{
@@ -31,7 +31,7 @@ const NavLink: React.FC<{
 }> = ({ icon, label, isActive, onClick, variant = 'default' }) => (
     <button
         onClick={onClick}
-        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-semibold transition-all cursor-pointer ${
+        className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl font-semibold transition-all cursor-pointer ${
             isActive 
               ? (variant === 'red' ? 'bg-[#ef4444] text-white shadow-lg shadow-red-950/40 font-bold' : 'bg-[#10b981] text-white shadow-lg font-bold')
               : (variant === 'red' ? 'text-red-400 hover:bg-red-500/15 hover:text-red-300' : 'text-text-secondary hover:bg-secondary hover:text-text-primary')
@@ -353,15 +353,29 @@ const App: React.FC = () => {
                 );
             case 'dashboard':
             default:
-                return <Dashboard members={members} payments={payments} accessorySales={accessorySales} role={role} onNavigate={(v) => setView(v)} onDeletePayment={handleDeletePayment} isUnlocked={isUnlocked} onUnlockRequest={openUnlockModal} />;
+                return (
+                    <Dashboard
+                        members={members}
+                        payments={payments}
+                        accessorySales={accessorySales}
+                        role={role}
+                        onNavigate={(v) => setView(v)}
+                        onDeletePayment={handleDeletePayment}
+                        isUnlocked={isUnlocked}
+                        onUnlockRequest={openUnlockModal}
+                    />
+                );
         }
     };
 
     const sidebarContent = (
-        <div className="h-full bg-surface flex flex-col p-4 overflow-y-auto">
-            <h1 className="text-2xl font-black text-center mb-6 mt-3 text-[#10b981] tracking-tight">{gymName}</h1>
-            <div className="mb-6">
-                <div className="p-3 bg border border-gray-800/80 rounded-xl flex items-center justify-between shadow-inner">
+        <div className="h-full bg-surface flex flex-col px-4 py-3.5 overflow-y-auto">
+            <div className="flex items-center justify-center gap-2.5 mb-4 mt-1 px-2">
+                <DumbbellLogoIcon className="h-7 w-7 text-amber-400 shrink-0 drop-shadow-[0_0_8px_rgba(251,191,36,0.35)]" />
+                <h1 className="text-2xl font-black text-center text-text-primary tracking-tight truncate">{gymName}</h1>
+            </div>
+            <div className="mb-4">
+                <div className="p-2.5 bg-background/50 border border-gray-800/80 rounded-xl flex items-center justify-between shadow-inner">
                     <div className="flex items-center space-x-3">
                         <div className="h-9 w-9 rounded-full bg-[#10b981] flex items-center justify-center text-white font-black text-base shadow-md">
                             {role[0]}
@@ -394,7 +408,7 @@ const App: React.FC = () => {
                 </div>
             </div>
             
-            <nav className="flex-grow space-y-2">
+            <nav className="flex-grow space-y-1">
                 {role !== 'Member' && (
                     <>
                         <NavLink icon={<DashboardIcon />} label="Dashboard" isActive={view === 'dashboard'} onClick={() => setView('dashboard')} />
@@ -417,7 +431,7 @@ const App: React.FC = () => {
                      </>
                 )}
             </nav>
-            <div className="mt-auto pt-4 border-t border-gray-700 space-y-3">
+            <div className="mt-auto pt-3 border-t border-gray-800 space-y-2">
                 {/* Financial Privacy Settings */}
                 {role !== 'Member' && (
                     <div className="px-4 py-2 bg-secondary/40 rounded-lg flex items-center justify-between border border-gray-800/50">
@@ -554,7 +568,7 @@ const App: React.FC = () => {
             </div>
             {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 lg:hidden" onClick={() => setIsSidebarOpen(false)}></div>}
             
-            <main className="flex-1 flex flex-col overflow-y-auto">
+            <main className={`flex-1 flex flex-col ${view === 'dashboard' ? 'overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto'}`}>
                 <header className="bg-surface p-4 flex justify-between items-center lg:hidden sticky top-0 z-20 shadow-md">
                     <button onClick={() => setIsSidebarOpen(true)}>
                         <MenuIcon className="h-6 w-6 text-text-primary"/>
